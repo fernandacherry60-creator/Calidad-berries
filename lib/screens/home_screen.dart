@@ -21,7 +21,7 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Calidad Berries'),
+        title: Text(auth.usuario?.esAdmin == true ? 'Panel de administración' : 'Panel de trabajador'),
         actions: [
           IconButton(
             tooltip: 'Resumen',
@@ -81,9 +81,19 @@ class HomeScreen extends StatelessWidget {
               children: [
                 Text('Hola, $nombre',
                     style: Theme.of(context).textTheme.titleLarge),
-                Text('Aseguramiento de calidad - elige un módulo',
+                Text(auth.usuario?.esAdmin == true ? 'Control general y aseguramiento de calidad' : 'Herramientas de trabajo y captura de muestreos',
                     style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 20),
+                if (auth.usuario?.esAdmin == true) ...[
+                  _ModuloCard(
+                    icono: Icons.manage_accounts_outlined,
+                    titulo: 'Gestionar trabajadores',
+                    descripcion: 'Administrar usuarios, accesos y códigos de ingreso.',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const AdminScreen())),
+                  ),
+                  const SizedBox(height: 14),
+                ],
                 _ModuloCard(
                   icono: Icons.local_shipping_outlined,
                   titulo: 'Andenes',
