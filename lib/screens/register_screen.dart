@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/constants.dart';
 import '../core/theme.dart';
@@ -49,6 +50,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _password.text,
         emailRedirectTo: 'calidadberriespro://auth-callback',
       );
+      if (response.user != null) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('pending_invite_code', _codigo.text.trim().toUpperCase());
+        await prefs.setString('pending_invite_email', _email.text.trim().toLowerCase());
+        await prefs.setString('pending_invite_name', _nombre.text.trim());
+        await prefs.setString('pending_invite_position', _puesto ?? 'Trabajador');
+      }
       if (response.user == null) {
         error = 'No fue posible crear la cuenta';
       } else if (response.session == null) {
