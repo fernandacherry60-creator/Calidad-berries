@@ -1,3 +1,4 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -29,10 +30,10 @@ class AuthService extends ChangeNotifier {
   bool requiereCambioPassword = false;
 
   Future<void> init() async {
-    await _asegurarAdminInicial();
+    // La cuenta administradora se valida en Supabase.
     final prefs = await SharedPreferences.getInstance();
     final id = prefs.getInt(_kSessionKey);
-    if (id != null) {
+    if (id != null && Supabase.instance.client.auth.currentUser != null) {
       final d = await AppDatabase.instance.db;
       final rows = await d.query('users',
           where: 'id = ? AND active = 1', whereArgs: [id], limit: 1);
@@ -68,29 +69,47 @@ class AuthService extends ChangeNotifier {
       RegExp(r'^[\w.+-]+@[\w-]+\.[\w.]+$').hasMatch(e);
 
   Future<String?> login(String email, String password) async {
-    final d = await AppDatabase.instance.db;
-    final rows = await d.query('users',
-        where: 'email = ? AND active = 1',
-        whereArgs: [email.trim().toLowerCase()],
-        limit: 1);
-    if (rows.isEmpty) return 'Correo o contrasena incorrectos';
-    final row = rows.first;
-    final hash = _hash(password, row['salt'] as String);
-    if (hash != row['password_hash']) {
-      return 'Correo o contrasena incorrectos';
+    try {
+      final client = Supabase.instance.client;
+      final response = await client.auth.signInWithPassword(
+        email: email.trim().toLowerCase(), password: password);
+      if (response.user == null) return 'No se pudo iniciar sesión';
+      final profile = await client.from('cb_profiles').select()
+          .eq('user_id', response.user!.id).maybeSingle();
+      if (profile == null || profile['active'] != true) {
+        await client.auth.signOut();
+        return 'Cuenta sin activar. Confirma el correo de invitación.';
+      }
+      final d = await AppDatabase.instance.db;
+      final correo = (profile['email'] as String).toLowerCase();
+      final rows = await d.query('users', where: 'email = ?',
+          whereArgs: [correo], limit: 1);
+      final role = profile['role'] == 'admin' ? 'admin' : 'usuario';
+      final id = rows.isEmpty ? await d.insert('users', {
+        'email': correo, 'display_name': profile['display_name'],
+        'puesto': profile['puesto'], 'password_hash': 'cloud-auth',
+        'salt': 'cloud-auth', 'role': role,
+        'created_at': DateTime.now().toIso8601String()
+      }) : rows.first['id'] as int;
+      await d.update('users', {
+        'display_name': profile['display_name'],
+        'puesto': profile['puesto'], 'role': role,
+        'active': 1, 'must_change_password': 0
+      }, where: 'id = ?', whereArgs: [id]);
+      final updated = await d.query('users', where: 'id = ?',
+          whereArgs: [id], limit: 1);
+      _usuario = AppUser.fromMap(updated.first);
+      requiereCambioPassword = false;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_kSessionKey, id);
+      notifyListeners();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
+    } catch (e) {
+      debugPrint('Login nube: $e');
+      return 'No fue posible conectar con el servidor';
     }
-    _usuario = AppUser.fromMap(row);
-    // Se obliga a cambiar la contrasena si el admin la restablecio
-    // (bandera must_change_password) o si el admin inicial sigue con la
-    // contrasena de fabrica.
-    final marcado = ((row['must_change_password'] as int?) ?? 0) == 1;
-    requiereCambioPassword = marcado ||
-        (_usuario!.esAdmin &&
-            _hash(_passwordInicialAdmin, row['salt'] as String) == hash);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kSessionKey, _usuario!.id);
-    notifyListeners();
-    return null;
   }
 
   /// Registro con codigo de ingreso (un solo uso, define el acceso).
@@ -155,6 +174,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await Supabase.instance.client.auth.signOut();
     _usuario = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSessionKey);
