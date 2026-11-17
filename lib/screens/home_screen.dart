@@ -42,7 +42,7 @@ class HomeScreen extends StatelessWidget {
               tooltip: 'Administracion',
               icon: const Icon(Icons.admin_panel_settings_outlined),
               onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const AdminScreen())),
+                  MaterialPageRoute(builder: (_) => const EquipoNubeScreen())),
             ),
           IconButton(
             tooltip: 'Cerrar sesion',
@@ -132,8 +132,8 @@ class HomeScreen extends StatelessWidget {
                   _ModuloCard(
                     icono: Icons.manage_accounts_outlined,
                     color: AppColors.berry,
-                    titulo: 'Gestionar trabajadores',
-                    descripcion: 'Administrar usuarios, accesos y códigos de ingreso.',
+                    titulo: 'Catálogos locales',
+                    descripcion: 'Configurar ranchos y variedades en este teléfono.',
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const AdminScreen())),
                   ),
