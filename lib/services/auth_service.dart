@@ -22,7 +22,6 @@ import '../data/models.dart';
 class AuthService extends ChangeNotifier {
   static const _kSessionKey = 'session_user_id';
   static const _iteraciones = 30000;
-  static const _passwordInicialAdmin = 'cambiar123';
 
   AppUser? _usuario;
   AppUser? get usuario => _usuario;
@@ -106,26 +105,6 @@ class AuthService extends ChangeNotifier {
     await prefs.setInt(_kSessionKey, id);
     notifyListeners();
   }
-
-  Future<void> _asegurarAdminInicial() async {
-    final d = await AppDatabase.instance.db;
-    final r = await d.rawQuery('SELECT COUNT(*) c FROM users');
-    if (((r.first['c'] as int?) ?? 0) == 0) {
-      final salt = _nuevaSal();
-      await d.insert('users', {
-        'email': 'admin@calidad.app',
-        'display_name': 'Administrador',
-        'puesto': 'Administrador',
-        'password_hash': _hash(_passwordInicialAdmin, salt),
-        'salt': salt,
-        'role': 'admin',
-        'created_at': DateTime.now().toIso8601String(),
-      });
-    }
-  }
-
-  bool _emailValido(String e) =>
-      RegExp(r'^[\w.+-]+@[\w-]+\.[\w.]+$').hasMatch(e);
 
   Future<String?> login(String email, String password) async {
     try {
