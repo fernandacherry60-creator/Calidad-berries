@@ -119,8 +119,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: const InputDecoration(
                       labelText: 'Codigo de ingreso',
                       prefixIcon: Icon(Icons.vpn_key_outlined)),
-                  validator: (v) => (v == null || v.trim().length < 6)
-                      ? 'Escribe el codigo de 6 caracteres'
+                  validator: (v) => (v == null || v.trim().length != 12)
+                      ? 'Escribe el código de 12 caracteres'
                       : null,
                 ),
                 const SizedBox(height: 16),
