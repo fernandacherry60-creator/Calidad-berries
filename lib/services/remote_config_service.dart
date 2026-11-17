@@ -11,8 +11,8 @@ class RemoteConfigService extends ChangeNotifier {
     'enable_cloud_sync': true,
   };
   Map<String, dynamic> release = const {
-    'minimum_version': '1.6.0',
-    'recommended_version': '1.6.0',
+    'minimum_version': '1.0.0',
+    'recommended_version': '1.0.0',
     'maintenance': false,
     'message': '',
   };
