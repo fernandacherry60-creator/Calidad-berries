@@ -1,0 +1,51 @@
+name: Compilar APK
+
+# Se puede lanzar a mano desde la pestana Actions (boton "Run workflow")
+# o automaticamente al subir cambios a la rama principal.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Instalar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Dependencias
+        run: flutter pub get
+
+      # Regenera los iconos de Android a partir de assets/icon/.
+      # El proyecto ya trae los archivos generados, asi que este paso es
+      # una red de seguridad: si falla, el APK igual sale con el icono nuevo.
+      - name: Generar iconos
+        continue-on-error: true
+        run: dart run flutter_launcher_icons
+
+      # Informativo: no detiene la compilacion por avisos de deprecacion.
+      - name: Revisar codigo
+        continue-on-error: true
+        run: flutter analyze
+
+      - name: Compilar APK release
+        run: flutter build apk --release
+
+      - name: Publicar el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
