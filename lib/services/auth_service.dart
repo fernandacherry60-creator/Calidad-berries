@@ -64,6 +64,24 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _canjearInvitacionPendiente(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString('pending_invite_email') != email.toLowerCase()) return;
+    final code = prefs.getString('pending_invite_code');
+    if (code == null) return;
+    final ok = await Supabase.instance.client.rpc('cb_redeem_invitation', params: {
+      'p_code': code,
+      'p_name': prefs.getString('pending_invite_name') ?? 'Trabajador',
+      'p_puesto': prefs.getString('pending_invite_position') ?? 'Trabajador',
+    });
+    if (ok == true) {
+      for (final key in ['pending_invite_email','pending_invite_code',
+          'pending_invite_name','pending_invite_position']) {
+        await prefs.remove(key);
+      }
+    }
+  }
+
   Future<void> _guardarPerfilLocal(Map<String, dynamic> profile) async {
     final d = await AppDatabase.instance.db;
     final correo = (profile['email'] as String).toLowerCase();
@@ -115,8 +133,13 @@ class AuthService extends ChangeNotifier {
       final response = await client.auth.signInWithPassword(
         email: email.trim().toLowerCase(), password: password);
       if (response.user == null) return 'No se pudo iniciar sesión';
-      final profile = await client.from('cb_profiles').select()
+      var profile = await client.from('cb_profiles').select()
           .eq('user_id', response.user!.id).maybeSingle();
+      if (profile == null) {
+        await _canjearInvitacionPendiente(response.user!.email ?? '');
+        profile = await client.from('cb_profiles').select()
+            .eq('user_id', response.user!.id).maybeSingle();
+      }
       if (profile == null || profile['active'] != true) {
         await client.auth.signOut();
         return 'Cuenta sin activar. Confirma el correo de invitación.';
