@@ -25,6 +25,18 @@ async function db() {
   }
   return dbPromise;
 }
+export async function cacheVerifiedProfile(p: Profile) {
+  await SecureStore.setItemAsync('verified_profile', JSON.stringify(p));
+}
+export async function getCachedProfile(userId: string): Promise<Profile | null> {
+  const raw = await SecureStore.getItemAsync('verified_profile');
+  if (!raw) return null;
+  const profile = JSON.parse(raw) as Profile;
+  return profile.user_id === userId && profile.active ? profile : null;
+}
+export async function clearCachedProfile() {
+  await SecureStore.deleteItemAsync('verified_profile');
+}
 export async function savePending(p: PendingInvite) {
   await SecureStore.setItemAsync('pending_invite', JSON.stringify(p));
 }
