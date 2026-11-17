@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants.dart';
 import '../core/theme.dart';
@@ -40,20 +41,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _cargando = true;
       _error = null;
     });
-    final error = await context.read<AuthService>().registrar(
-          nombre: _nombre.text,
-          email: _email.text,
-          password: _password.text,
-          codigo: _codigo.text,
-          puesto: _puesto ?? '',
-        );
+    String? error;
+    try {
+      final client = Supabase.instance.client;
+      final response = await client.auth.signUp(
+        email: _email.text.trim().toLowerCase(),
+        password: _password.text,
+        emailRedirectTo: 'calidadberriespro://auth-callback',
+      );
+      if (response.user == null) {
+        error = 'No fue posible crear la cuenta';
+      } else if (response.session == null) {
+        error = 'Confirma tu correo y después inicia sesión para activar el código.';
+      } else {
+        final ok = await client.rpc('cb_redeem_invitation', params: {
+          'p_code': _codigo.text.trim().toUpperCase(),
+          'p_name': _nombre.text.trim(),
+          'p_puesto': _puesto ?? 'Trabajador',
+        });
+        if (ok != true) {
+          error = 'Código inválido o vencido. Solicita uno nuevo a Fernanda.';
+        } else {
+          await context.read<AuthService>().init();
+        }
+      }
+    } on AuthException catch (e) {
+      error = e.message;
+    } catch (e) {
+      error = 'No se pudo validar el registro: $e';
+    }
     if (!mounted) return;
     setState(() {
       _cargando = false;
       _error = error;
     });
     if (error == null) {
-      // Sesion iniciada; el enrutador de main.dart mostrara el inicio.
       Navigator.popUntil(context, (r) => r.isFirst);
     }
   }
