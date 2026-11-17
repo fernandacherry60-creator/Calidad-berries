@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -21,12 +22,12 @@ Future<void> main() async {
   await sync.init();
   await remoteConfig.init();
   if (auth.autenticado) {
-    sync.sincronizar();
+    unawaited(sync.sincronizar());
   }
   auth.addListener(() {
     if (auth.autenticado) {
       sync.sincronizar();
-      remoteConfig.refresh();
+      unawaited(remoteConfig.refresh());
     }
   });
   runApp(CalidadBerriesApp(auth: auth, sync: sync, remoteConfig: remoteConfig));
@@ -47,7 +48,7 @@ class CalidadBerriesApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: remoteConfig),
       ],
       child: MaterialApp(
-        title: 'Calidad Berries',
+        title: 'Calidad Berries Pro',
         debugShowCheckedModeBanner: false,
         theme: buildTheme(),
         home: Consumer<AuthService>(
