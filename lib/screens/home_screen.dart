@@ -5,6 +5,7 @@ import '../core/theme.dart';
 import '../services/auth_service.dart';
 import '../widgets/common.dart';
 import 'admin_screen.dart';
+import 'equipo_nube_screen.dart';
 import 'dashboard_screen.dart';
 import 'anden/anden_form_screen.dart';
 import 'calculadora_screen.dart';
@@ -119,6 +120,15 @@ class HomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 20),
                 if (auth.usuario?.esAdmin == true) ...[
+                  _ModuloCard(
+                    icono: Icons.cloud_outlined,
+                    color: AppColors.blue,
+                    titulo: 'Equipo en la nube',
+                    descripcion: 'Invitar trabajadores y consultar sus cuentas.',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const EquipoNubeScreen())),
+                  ),
+                  const SizedBox(height: 14),
                   _ModuloCard(
                     icono: Icons.manage_accounts_outlined,
                     color: AppColors.berry,
