@@ -212,10 +212,37 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Administracion')),
+      appBar: AppBar(title: const Text('Administración')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.berry, AppColors.purple],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(children: [
+              const Icon(Icons.groups_rounded, color: Colors.white, size: 44),
+              const SizedBox(width: 16),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Equipo de trabajo',
+                    style: TextStyle(color: Colors.white,
+                      fontSize: 21, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Text('${_usuarios.length} usuarios registrados en este equipo',
+                    style: const TextStyle(color: Colors.white)),
+                ],
+              )),
+            ]),
+          ),
+          const SizedBox(height: 24),
           const TituloSeccion('Usuarios'),
           Card(
             child: Column(
@@ -223,12 +250,12 @@ class _AdminScreenState extends State<AdminScreen> {
                 for (final u in _usuarios)
                   ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                      backgroundColor: (u.esAdmin ? AppColors.purple : AppColors.blue).withOpacity(0.12),
                       child: Icon(
                           u.esAdmin
                               ? Icons.admin_panel_settings
                               : Icons.person,
-                          color: AppColors.primary),
+                          color: u.esAdmin ? AppColors.purple : AppColors.blue),
                     ),
                     title: Text(u.displayName,
                         style:
@@ -335,14 +362,14 @@ class _AdminScreenState extends State<AdminScreen> {
               children: [
                 ListTile(
                   leading:
-                      const Icon(Icons.agriculture_outlined, color: AppColors.primary),
+                      const Icon(Icons.agriculture_outlined, color: AppColors.orange),
                   title: const Text('Agregar rancho'),
                   trailing: const Icon(Icons.add),
                   onTap: _nuevoRancho,
                 ),
                 const Divider(height: 1),
                 ListTile(
-                  leading: const Icon(Icons.spa_outlined, color: AppColors.primary),
+                  leading: const Icon(Icons.spa_outlined, color: AppColors.berry),
                   title: const Text('Agregar variedad'),
                   trailing: const Icon(Icons.add),
                   onTap: _nuevaVariedad,
