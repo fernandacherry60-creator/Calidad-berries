@@ -177,25 +177,8 @@ class AuthService extends ChangeNotifier {
 
   // ---- codigos de ingreso (solo admin) ----
 
-  Future<String?> generarCodigo(String role) async {
-    if (!(_usuario?.esAdmin ?? false)) return null;
-    final d = await AppDatabase.instance.db;
-    // Sin caracteres confusos (0/O, 1/I/L).
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    final rnd = Random.secure();
-    String code;
-    do {
-      code = List.generate(6, (_) => chars[rnd.nextInt(chars.length)]).join();
-    } while ((await d.query('invite_codes',
-            where: 'code = ?', whereArgs: [code], limit: 1))
-        .isNotEmpty);
-    await d.insert('invite_codes', {
-      'code': code,
-      'role': role,
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    return code;
-  }
+  // Nunca emitir invitaciones locales que no funcionen entre dispositivos.
+  Future<String?> generarCodigo(String role) async => null;
 
   Future<List<Map<String, Object?>>> listarCodigos() async {
     final d = await AppDatabase.instance.db;
