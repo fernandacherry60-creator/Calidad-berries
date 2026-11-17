@@ -30,21 +30,62 @@ class AuthService extends ChangeNotifier {
   bool requiereCambioPassword = false;
 
   Future<void> init() async {
-    // La cuenta administradora se valida en Supabase.
-    final prefs = await SharedPreferences.getInstance();
-    final id = prefs.getInt(_kSessionKey);
-    if (id != null && Supabase.instance.client.auth.currentUser != null) {
-      final d = await AppDatabase.instance.db;
-      final rows = await d.query('users',
-          where: 'id = ? AND active = 1', whereArgs: [id], limit: 1);
-      if (rows.isNotEmpty) {
-        _usuario = AppUser.fromMap(rows.first);
-        // Si el admin restablecio la contrasena mientras la sesion seguia
-        // abierta, al reabrir la app se exige definir una nueva.
-        requiereCambioPassword =
-            ((rows.first['must_change_password'] as int?) ?? 0) == 1;
-      }
+    final client = Supabase.instance.client;
+    final sessionUser = client.auth.currentUser;
+    if (sessionUser == null) {
+      _usuario = null;
+      notifyListeners();
+      return;
     }
+    try {
+      final profile = await client.from('cb_profiles').select()
+          .eq('user_id', sessionUser.id).maybeSingle();
+      if (profile == null || profile['active'] != true) {
+        await client.auth.signOut();
+        _usuario = null;
+        notifyListeners();
+        return;
+      }
+      await _guardarPerfilLocal(profile);
+    } catch (e) {
+      // Offline: restaurar solo la cuenta vinculada a la sesión Supabase.
+      final prefs = await SharedPreferences.getInstance();
+      final id = prefs.getInt(_kSessionKey);
+      if (id != null) {
+        final d = await AppDatabase.instance.db;
+        final rows = await d.query('users',
+          where: 'id = ? AND email = ? AND active = 1',
+          whereArgs: [id, sessionUser.email?.toLowerCase()], limit: 1);
+        if (rows.isNotEmpty) _usuario = AppUser.fromMap(rows.first);
+      }
+      debugPrint('Perfil remoto no disponible: $e');
+    }
+    requiereCambioPassword = false;
+    notifyListeners();
+  }
+
+  Future<void> _guardarPerfilLocal(Map<String, dynamic> profile) async {
+    final d = await AppDatabase.instance.db;
+    final correo = (profile['email'] as String).toLowerCase();
+    final rows = await d.query('users', where: 'email = ?',
+        whereArgs: [correo], limit: 1);
+    final role = profile['role'] == 'admin' ? 'admin' : 'usuario';
+    final id = rows.isEmpty ? await d.insert('users', {
+      'email': correo, 'display_name': profile['display_name'],
+      'puesto': profile['puesto'], 'password_hash': 'cloud-auth',
+      'salt': 'cloud-auth', 'role': role,
+      'created_at': DateTime.now().toIso8601String()
+    }) : rows.first['id'] as int;
+    await d.update('users', {
+      'display_name': profile['display_name'], 'puesto': profile['puesto'],
+      'role': role, 'active': 1, 'must_change_password': 0
+    }, where: 'id = ?', whereArgs: [id]);
+    final updated = await d.query('users', where: 'id = ?',
+        whereArgs: [id], limit: 1);
+    _usuario = AppUser.fromMap(updated.first);
+    requiereCambioPassword = false;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_kSessionKey, id);
     notifyListeners();
   }
 
@@ -80,29 +121,7 @@ class AuthService extends ChangeNotifier {
         await client.auth.signOut();
         return 'Cuenta sin activar. Confirma el correo de invitación.';
       }
-      final d = await AppDatabase.instance.db;
-      final correo = (profile['email'] as String).toLowerCase();
-      final rows = await d.query('users', where: 'email = ?',
-          whereArgs: [correo], limit: 1);
-      final role = profile['role'] == 'admin' ? 'admin' : 'usuario';
-      final id = rows.isEmpty ? await d.insert('users', {
-        'email': correo, 'display_name': profile['display_name'],
-        'puesto': profile['puesto'], 'password_hash': 'cloud-auth',
-        'salt': 'cloud-auth', 'role': role,
-        'created_at': DateTime.now().toIso8601String()
-      }) : rows.first['id'] as int;
-      await d.update('users', {
-        'display_name': profile['display_name'],
-        'puesto': profile['puesto'], 'role': role,
-        'active': 1, 'must_change_password': 0
-      }, where: 'id = ?', whereArgs: [id]);
-      final updated = await d.query('users', where: 'id = ?',
-          whereArgs: [id], limit: 1);
-      _usuario = AppUser.fromMap(updated.first);
-      requiereCambioPassword = false;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_kSessionKey, id);
-      notifyListeners();
+      await _guardarPerfilLocal(profile);
       return null;
     } on AuthException catch (e) {
       return e.message;
