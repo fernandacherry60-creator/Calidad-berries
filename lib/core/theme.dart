@@ -13,6 +13,9 @@ class AppColors {
   // Paleta principal: "huerto al amanecer".
   static const Color primary = Color(0xFF14532D); // verde hoja profundo
   static const Color primaryLight = Color(0xFF2E7D46);
+  static const Color blue = Color(0xFF2563EB);
+  static const Color orange = Color(0xFFEA580C);
+  static const Color purple = Color(0xFF7C3AED);
   static const Color berry = Color(0xFFB4234B); // frambuesa madura (accion / marca)
   static const Color surface = Color(0xFFFAF7F2); // crema calido, descansa la vista
   static const Color card = Color(0xFFFFFFFF);
@@ -88,7 +91,7 @@ ThemeData buildTheme() {
       color: AppColors.card,
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         side: const BorderSide(color: AppColors.line),
       ),
       margin: EdgeInsets.zero,
@@ -116,7 +119,7 @@ ThemeData buildTheme() {
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.berry,
         foregroundColor: Colors.white,
         minimumSize: const Size.fromHeight(54), // objetivo tactil grande
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
