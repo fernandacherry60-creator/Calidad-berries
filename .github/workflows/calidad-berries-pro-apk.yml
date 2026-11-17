@@ -1,4 +1,4 @@
-name: APK Calidad Berries Pro
+name: Validación Calidad Berries Pro
 on:
   workflow_dispatch:
   push:
@@ -16,8 +16,3 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
-      - run: flutter build apk --debug
-      - uses: actions/upload-artifact@v4
-        with:
-          name: calidad-berries-pro-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
