@@ -123,60 +123,8 @@ class AuthService extends ChangeNotifier {
   }) async {
     // No crear cuentas solo locales en la versión Pro: deben existir en Supabase.
     return 'El registro de trabajadores estará disponible cuando se activen las invitaciones en la nube.';
-    /*
-    final e = email.trim().toLowerCase();
-    if (nombre.trim().length < 3) return 'Escribe tu nombre completo';
-    if (!_emailValido(e)) return 'El correo no es valido';
-    if (password.length < 8) {
-      return 'La contrasena debe tener al menos 8 caracteres';
-    }
-    final d = await AppDatabase.instance.db;
-    final existe =
-        await d.query('users', where: 'email = ?', whereArgs: [e], limit: 1);
-    if (existe.isNotEmpty) return 'Ya existe una cuenta con ese correo';
-
-    final codigoRows = await d.query('invite_codes',
-        where: 'code = ? AND used_by IS NULL',
-        whereArgs: [codigo.trim().toUpperCase()],
-        limit: 1);
-    if (codigoRows.isEmpty) {
-      return 'Codigo de ingreso invalido o ya utilizado';
-    }
-    final invite = codigoRows.first;
-
-    if (puesto.trim().isEmpty) return 'Selecciona tu puesto';
-    final salt = _nuevaSal();
-    final userId = await d.insert('users', {
-      'email': e,
-      'display_name': nombre.trim(),
-      'puesto': puesto.trim(),
-      'password_hash': _hash(password, salt),
-      'salt': salt,
-      'role': invite['role'],
-      'created_at': DateTime.now().toIso8601String(),
-    });
-    await d.update(
-      'invite_codes',
-      {'used_by': userId, 'used_at': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [invite['id']],
-    );
-
-    // Inicia sesion directo tras registrarse.
-    _usuario = AppUser(
-      id: userId,
-      email: e,
-      displayName: nombre.trim(),
-      puesto: puesto.trim(),
-      role: invite['role'] as String,
-    );
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kSessionKey, userId);
-    notifyListeners();
-    return null;
   }
 
-    */
   Future<void> logout() async {
     await Supabase.instance.client.auth.signOut();
     _usuario = null;
