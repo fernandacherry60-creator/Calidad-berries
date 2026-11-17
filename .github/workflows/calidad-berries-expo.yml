@@ -1,0 +1,30 @@
+name: Expo Calidad Berries Pro - validación
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/paneles-admin-trabajador-20261117]
+    paths:
+      - 'expo/**'
+      - '.github/workflows/calidad-berries-expo.yml'
+permissions:
+  contents: read
+concurrency:
+  group: expo-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Verificar TypeScript
+        run: npx tsc --noEmit
+      - name: Comprobar Expo
+        run: npx expo config --type public

@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../services/auth_service.dart';
+import '../services/remote_config_service.dart';
 import '../widgets/common.dart';
 import 'admin_screen.dart';
+import 'equipo_nube_screen.dart';
+import 'muestreos_nube_screen.dart';
 import 'dashboard_screen.dart';
 import 'anden/anden_form_screen.dart';
 import 'calculadora_screen.dart';
@@ -17,6 +20,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
+    final remote = context.watch<RemoteConfigService>();
     final nombre = auth.usuario?.displayName ?? '';
     final esAdmin = auth.usuario?.esAdmin == true;
 
@@ -41,7 +45,7 @@ class HomeScreen extends StatelessWidget {
               tooltip: 'Administracion',
               icon: const Icon(Icons.admin_panel_settings_outlined),
               onPressed: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => const AdminScreen())),
+                  MaterialPageRoute(builder: (_) => const EquipoNubeScreen())),
             ),
           IconButton(
             tooltip: 'Cerrar sesion',
@@ -120,16 +124,34 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 if (auth.usuario?.esAdmin == true) ...[
                   _ModuloCard(
+                    icono: Icons.cloud_done_outlined,
+                    color: AppColors.primary,
+                    titulo: 'Muestreos del equipo',
+                    descripcion: 'Consultar capturas sincronizadas desde otros teléfonos.',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const MuestreosNubeScreen())),
+                  ),
+                  const SizedBox(height: 14),
+                  _ModuloCard(
+                    icono: Icons.cloud_outlined,
+                    color: AppColors.blue,
+                    titulo: 'Equipo en la nube',
+                    descripcion: 'Invitar trabajadores y consultar sus cuentas.',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const EquipoNubeScreen())),
+                  ),
+                  const SizedBox(height: 14),
+                  _ModuloCard(
                     icono: Icons.manage_accounts_outlined,
                     color: AppColors.berry,
-                    titulo: 'Gestionar trabajadores',
-                    descripcion: 'Administrar usuarios, accesos y códigos de ingreso.',
+                    titulo: 'Catálogos locales',
+                    descripcion: 'Configurar ranchos y variedades en este teléfono.',
                     onTap: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const AdminScreen())),
                   ),
                   const SizedBox(height: 14),
                 ],
-                _ModuloCard(
+                if (remote.enabled('enable_sampling')) _ModuloCard(
                   icono: Icons.local_shipping_outlined,
                   color: AppColors.primaryLight,
                   titulo: 'Andenes',
@@ -142,7 +164,7 @@ class HomeScreen extends StatelessWidget {
                               const AndenFormScreen(cultivo: 'Frambuesa'))),
                 ),
                 const SizedBox(height: 14),
-                _ModuloCard(
+                if (remote.enabled('enable_sampling')) _ModuloCard(
                   icono: Icons.science_outlined,
                   color: AppColors.blue,
                   titulo: 'Fruta proceso',

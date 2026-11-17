@@ -27,6 +27,7 @@ import '../data/database.dart';
 class SyncService extends ChangeNotifier {
   final _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _sub;
+  StreamSubscription<AuthState>? _authSub;
 
   bool conectado = false;
   bool sincronizando = false;
@@ -50,6 +51,12 @@ class SyncService extends ChangeNotifier {
         unawaited(sincronizar());
       }
     });
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.event == AuthChangeEvent.signedIn ||
+          event.event == AuthChangeEvent.tokenRefreshed) {
+        if (conectado) unawaited(sincronizar());
+      }
+    });
     await refrescarPendientes();
     // Al abrir la app con red, subir lo que haya quedado pendiente.
     if (conectado && pendientes > 0) {
@@ -70,7 +77,10 @@ class SyncService extends ChangeNotifier {
   }
 
   Future<void> sincronizar() async {
-    if (!conectado || sincronizando) return;
+    // La nube nueva exige una sesión Supabase válida y un perfil activo.
+    // Sin ella, conservar todos los registros en SQLite como pendientes.
+    if (!conectado || sincronizando ||
+        Supabase.instance.client.auth.currentUser == null) return;
     sincronizando = true;
     notifyListeners();
     try {
@@ -79,6 +89,10 @@ class SyncService extends ChangeNotifier {
         final rows = await d.query(tabla,
             where: 'sync_status = ?', whereArgs: ['pendiente'], limit: 100);
         for (final row in rows) {
+          // Nunca enviar muestras de otra cuenta que usó este dispositivo.
+          final capturista = await _identidad(row['user_id'] as int?);
+          final actual = Supabase.instance.client.auth.currentUser?.email?.toLowerCase();
+          if (actual == null || capturista['email']?.toLowerCase() != actual) continue;
           final ok = await _subirRegistro(tabla, row);
           if (ok) {
             await d.update(tabla, {'sync_status': 'sincronizado'},
@@ -86,6 +100,8 @@ class SyncService extends ChangeNotifier {
           }
         }
       }
+    } catch (e) {
+      debugPrint('Error general de sincronización: $e');
     } finally {
       sincronizando = false;
       await refrescarPendientes();
@@ -101,11 +117,25 @@ class SyncService extends ChangeNotifier {
   /// un intento anterior si llego al servidor: se considera sincronizado.
   Future<bool> _subirRegistro(String tabla, Map<String, Object?> row) async {
     try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentUser == null) return false;
       final payload = await _payloadPara(row);
-      await Supabase.instance.client.from(tabla).insert(payload);
+      await client.from(tabla).insert(payload);
       return true;
     } on PostgrestException catch (e) {
-      if (e.code == '23505') return true; // uuid duplicado: ya estaba subido
+      // Un UUID duplicado puede pertenecer a otra cuenta: no confirmar
+      // sincronización sin una comprobación de propiedad.
+      if (e.code == '23505') {
+        final actual = Supabase.instance.client.auth.currentUser;
+        if (actual == null) return false;
+        try {
+          final existente = await Supabase.instance.client.from(tabla)
+              .select('uuid').eq('uuid', row['uuid'] as String).maybeSingle();
+          return existente != null;
+        } catch (_) {
+          return false;
+        }
+      }
       debugPrint('Sync fallo en $tabla: $e');
       return false;
     } catch (e) {
@@ -168,6 +198,7 @@ class SyncService extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    _authSub?.cancel();
     super.dispose();
   }
 }

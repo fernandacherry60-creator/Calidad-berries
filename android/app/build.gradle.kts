@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.calidad_berries"
+    namespace = "com.klunder.calidadberriespro"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.calidad_berries"
+        applicationId = "com.klunder.calidadberriespro"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -29,7 +29,8 @@ android {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // La firma de producción se configurará antes de la primera release.
+            // Nunca distribuir una release firmada con clave de depuración.
         }
     }
 }

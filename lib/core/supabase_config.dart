@@ -1,9 +1,7 @@
-/// Credenciales del backend Supabase (proyecto: calidad-berries).
-///
-/// La llave publishable es publica por diseno: viaja dentro del APK y las
-/// politicas RLS del servidor solo le permiten INSERTAR registros. No puede
-/// leer, modificar ni borrar nada. La llave secreta (sb_secret_...) JAMAS
-/// debe incluirse en la app.
-const String kSupabaseUrl = 'https://rtcncogedsyvnqsdfbeo.supabase.co';
+/// Backend exclusivo de Calidad Berries Pro.
+/// Solo se incluye la llave publicable; nunca una llave secreta.
+/// La autorización de datos depende de Supabase Auth y políticas RLS.
+/// Antes de activar la sincronización, completar migración y pruebas.
+const String kSupabaseUrl = 'https://zcwtlremnqkptjzlnpao.supabase.co';
 const String kSupabaseKey =
-    'sb_publishable_h1F0E17QuZ_R7Q6sfWcG3g_NPMuXL2O';
+    'sb_publishable_ZaOo-I-NZo-Gx8UeT_k4Qg_GLFNEJhT';

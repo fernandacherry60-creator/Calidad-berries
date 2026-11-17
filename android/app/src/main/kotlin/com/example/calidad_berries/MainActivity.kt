@@ -1,4 +1,4 @@
-package com.example.calidad_berries
+package com.klunder.calidadberriespro
 
 import io.flutter.embedding.android.FlutterActivity
 
