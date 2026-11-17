@@ -1,7 +1,7 @@
 name: calidad_berries
 description: Aseguramiento de calidad de berries. Captura offline de muestreos de anden, fruta proceso y semaforizacion de riesgos.
 publish_to: "none"
-version: 1.6.0+7
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
