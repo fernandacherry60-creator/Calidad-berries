@@ -7,6 +7,7 @@ import '../services/remote_config_service.dart';
 import '../widgets/common.dart';
 import 'admin_screen.dart';
 import 'equipo_nube_screen.dart';
+import 'muestreos_nube_screen.dart';
 import 'dashboard_screen.dart';
 import 'anden/anden_form_screen.dart';
 import 'calculadora_screen.dart';
@@ -122,6 +123,15 @@ class HomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 20),
                 if (auth.usuario?.esAdmin == true) ...[
+                  _ModuloCard(
+                    icono: Icons.cloud_done_outlined,
+                    color: AppColors.primary,
+                    titulo: 'Muestreos del equipo',
+                    descripcion: 'Consultar capturas sincronizadas desde otros teléfonos.',
+                    onTap: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const MuestreosNubeScreen())),
+                  ),
+                  const SizedBox(height: 14),
                   _ModuloCard(
                     icono: Icons.cloud_outlined,
                     color: AppColors.blue,
