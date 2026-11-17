@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/theme.dart';
 import '../services/auth_service.dart';
+import '../services/remote_config_service.dart';
 import '../widgets/common.dart';
 import 'admin_screen.dart';
 import 'equipo_nube_screen.dart';
@@ -18,6 +19,7 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
+    final remote = context.watch<RemoteConfigService>();
     final nombre = auth.usuario?.displayName ?? '';
     final esAdmin = auth.usuario?.esAdmin == true;
 
@@ -139,7 +141,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                 ],
-                _ModuloCard(
+                if (remote.enabled('enable_sampling')) _ModuloCard(
                   icono: Icons.local_shipping_outlined,
                   color: AppColors.primaryLight,
                   titulo: 'Andenes',
@@ -152,7 +154,7 @@ class HomeScreen extends StatelessWidget {
                               const AndenFormScreen(cultivo: 'Frambuesa'))),
                 ),
                 const SizedBox(height: 14),
-                _ModuloCard(
+                if (remote.enabled('enable_sampling')) _ModuloCard(
                   icono: Icons.science_outlined,
                   color: AppColors.blue,
                   titulo: 'Fruta proceso',
