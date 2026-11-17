@@ -135,6 +135,35 @@ ThemeData buildTheme() {
         textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
       ),
     ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: AppColors.berry,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 52),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16)),
+        textStyle: const TextStyle(
+          fontSize: 16, fontWeight: FontWeight.w700),
+      ),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(
+        foregroundColor: AppColors.blue,
+        minimumSize: const Size(0, 44),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.orange,
+      foregroundColor: Colors.white,
+    ),
+    chipTheme: base.chipTheme.copyWith(
+      backgroundColor: AppColors.okBg,
+      selectedColor: AppColors.primaryLight,
+      side: const BorderSide(color: AppColors.line),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12)),
+    ),
     snackBarTheme: const SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: AppColors.ink,
