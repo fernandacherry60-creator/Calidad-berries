@@ -4,6 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Calidad Berries Pro',
   slug: 'calidad-berries-pro',
+  owner: 'tropicas-team',
   scheme: 'calidadberriespro',
   version: '1.0.0',
   orientation: 'portrait',
