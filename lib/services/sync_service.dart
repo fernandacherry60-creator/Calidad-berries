@@ -27,6 +27,7 @@ import '../data/database.dart';
 class SyncService extends ChangeNotifier {
   final _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _sub;
+  StreamSubscription<AuthState>? _authSub;
 
   bool conectado = false;
   bool sincronizando = false;
@@ -48,6 +49,12 @@ class SyncService extends ChangeNotifier {
       notifyListeners();
       if (!antes && conectado) {
         unawaited(sincronizar());
+      }
+    });
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+      if (event.event == AuthChangeEvent.signedIn ||
+          event.event == AuthChangeEvent.tokenRefreshed) {
+        if (conectado) unawaited(sincronizar());
       }
     });
     await refrescarPendientes();
@@ -185,6 +192,7 @@ class SyncService extends ChangeNotifier {
   @override
   void dispose() {
     _sub?.cancel();
+    _authSub?.cancel();
     super.dispose();
   }
 }
