@@ -1,0 +1,33 @@
+{
+  "name": "calidad-berries-pro-expo",
+  "version": "1.0.0",
+  "private": true,
+  "main": "node_modules/expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "check": "tsc --noEmit",
+    "doctor": "expo-doctor",
+    "build": "eas build --platform android --profile preview",
+    "update": "eas update --branch production"
+  },
+  "dependencies": {
+    "expo": "~54.0.0",
+    "expo-constants": "~18.0.0",
+    "expo-crypto": "~15.0.0",
+    "expo-linking": "~8.0.0",
+    "expo-secure-store": "~15.0.0",
+    "expo-sqlite": "~16.0.0",
+    "expo-updates": "~29.0.0",
+    "@react-native-community/netinfo": "11.4.1",
+    "@supabase/supabase-js": "^2.57.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2",
+    "expo-doctor": "^1.17.0"
+  }
+}
