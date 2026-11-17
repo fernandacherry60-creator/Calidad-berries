@@ -121,6 +121,9 @@ class AuthService extends ChangeNotifier {
     required String codigo,
     required String puesto,
   }) async {
+    // No crear cuentas solo locales en la versión Pro: deben existir en Supabase.
+    return 'El registro de trabajadores estará disponible cuando se activen las invitaciones en la nube.';
+    /*
     final e = email.trim().toLowerCase();
     if (nombre.trim().length < 3) return 'Escribe tu nombre completo';
     if (!_emailValido(e)) return 'El correo no es valido';
@@ -173,6 +176,7 @@ class AuthService extends ChangeNotifier {
     return null;
   }
 
+    */
   Future<void> logout() async {
     await Supabase.instance.client.auth.signOut();
     _usuario = null;
