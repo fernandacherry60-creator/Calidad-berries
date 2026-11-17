@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase, loadProfile, redeemPendingInvitation, type Profile } from './src/lib/cloud';
-import { savePending, saveSample, syncSamples, localSamples, pendingCount, type TableName, type LocalSample } from './src/lib/offline';
+import { savePending, saveSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
 type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo';
@@ -36,13 +36,22 @@ export default function App() {
   const [pending,setPending]=useState(0);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
   const refresh=useCallback(async()=>{
-    const {data:{user}}=await supabase.auth.getUser();
+    const {data:{session}}=await supabase.auth.getSession();
+    const user=session?.user;
     if(!user){setUserId(null);setProfile(null);return;}
     setUserId(user.id);
-    let p=await loadProfile(user.id);
-    if(!p&&user.email){await redeemPendingInvitation(user.email);p=await loadProfile(user.id);}
+    let p:Profile|null=null;
+    try {
+      p=await loadProfile(user.id);
+      if(!p&&user.email){await redeemPendingInvitation(user.email);p=await loadProfile(user.id);}
+      if(p?.active)await cacheVerifiedProfile(p);
+      else await clearCachedProfile();
+    } catch(e) {
+      // Sin internet: solo se acepta un perfil que antes fue validado por el servidor.
+      p=await getCachedProfile(user.id);
+    }
     setProfile(p?.active?p:null);
-    if(p?.active) setPending(await pendingCount(p.user_id));
+    if(p?.active)setPending(await pendingCount(p.user_id));
   },[]);
   useEffect(()=>{
     let alive=true;
@@ -73,7 +82,7 @@ export default function App() {
     const app=AppState.addEventListener('change',state=>{if(state==='active')void sync();});
     return ()=>{active=false;net();app.remove();};
   },[profile]);
-  async function logout(){await supabase.auth.signOut();setProfile(null);setUserId(null);setScreen('home');}
+  async function logout(){await supabase.auth.signOut();await clearCachedProfile();setProfile(null);setUserId(null);setScreen('home');}
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout}/>;
   const navigate=(next:Screen)=>setScreen(next);
