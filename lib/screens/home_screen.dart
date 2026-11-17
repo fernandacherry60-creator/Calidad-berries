@@ -18,6 +18,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthService>();
     final nombre = auth.usuario?.displayName ?? '';
+    final esAdmin = auth.usuario?.esAdmin == true;
 
     return Scaffold(
       appBar: AppBar(
@@ -79,14 +80,48 @@ class HomeScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                Text('Hola, $nombre',
-                    style: Theme.of(context).textTheme.titleLarge),
-                Text(auth.usuario?.esAdmin == true ? 'Control general y aseguramiento de calidad' : 'Herramientas de trabajo y captura de muestreos',
-                    style: Theme.of(context).textTheme.bodySmall),
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primary, AppColors.primaryLight],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Row(children: [
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(esAdmin ? 'ADMINISTRACIÓN' : 'MI JORNADA',
+                          style: const TextStyle(color: Colors.white70,
+                            fontSize: 12, fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2)),
+                        const SizedBox(height: 8),
+                        Text('Hola, $nombre', style: const TextStyle(
+                          color: Colors.white, fontSize: 24,
+                          fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 8),
+                        Text(esAdmin
+                          ? 'Gestiona tu equipo y controla la calidad.'
+                          : 'Registra y revisa tus muestreos.',
+                          style: const TextStyle(color: Colors.white)),
+                      ],
+                    )),
+                    const SizedBox(width: 12),
+                    Icon(esAdmin ? Icons.admin_panel_settings_rounded
+                      : Icons.spa_rounded, size: 48, color: Colors.white70),
+                  ]),
+                ),
+                const SizedBox(height: 20),
+                Text('Accesos rápidos',
+                  style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 20),
                 if (auth.usuario?.esAdmin == true) ...[
                   _ModuloCard(
                     icono: Icons.manage_accounts_outlined,
+                    color: AppColors.berry,
                     titulo: 'Gestionar trabajadores',
                     descripcion: 'Administrar usuarios, accesos y códigos de ingreso.',
                     onTap: () => Navigator.push(context,
@@ -96,6 +131,7 @@ class HomeScreen extends StatelessWidget {
                 ],
                 _ModuloCard(
                   icono: Icons.local_shipping_outlined,
+                  color: AppColors.primaryLight,
                   titulo: 'Andenes',
                   descripcion:
                       'Muestreo en recepcion: score de condicion y apariencia, disposicion de la tarima.',
@@ -108,6 +144,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 _ModuloCard(
                   icono: Icons.science_outlined,
+                  color: AppColors.blue,
                   titulo: 'Fruta proceso',
                   descripcion:
                       'Conteo de frutos por defecto, áreas de enfoque y potencial empacable.',
@@ -120,6 +157,7 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(height: 14),
                 _ModuloCard(
                   icono: Icons.calculate_outlined,
+                  color: AppColors.orange,
                   titulo: 'Calculadora de defectos',
                   descripcion:
                       'Simula un muestreo: porcentajes, puntos y disposición al instante, sin guardar registros.',
@@ -140,11 +178,13 @@ class HomeScreen extends StatelessWidget {
 
 class _ModuloCard extends StatelessWidget {
   final IconData icono;
+  final Color color;
   final String titulo;
   final String descripcion;
   final VoidCallback onTap;
   const _ModuloCard({
     required this.icono,
+    required this.color,
     required this.titulo,
     required this.descripcion,
     required this.onTap,
@@ -164,10 +204,10 @@ class _ModuloCard extends StatelessWidget {
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.08),
+                  color: color.withOpacity(0.13),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icono, size: 30, color: AppColors.primary),
+                child: Icon(icono, size: 30, color: color),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -182,7 +222,7 @@ class _ModuloCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: AppColors.inkSoft),
+              Icon(Icons.arrow_circle_right_rounded, color: color, size: 28),
             ],
           ),
         ),
