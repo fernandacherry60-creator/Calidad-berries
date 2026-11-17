@@ -89,6 +89,10 @@ class SyncService extends ChangeNotifier {
         final rows = await d.query(tabla,
             where: 'sync_status = ?', whereArgs: ['pendiente'], limit: 100);
         for (final row in rows) {
+          // Nunca enviar muestras de otra cuenta que usó este dispositivo.
+          final capturista = await _identidad(row['user_id'] as int?);
+          final actual = Supabase.instance.client.auth.currentUser?.email?.toLowerCase();
+          if (actual == null || capturista['email']?.toLowerCase() != actual) continue;
           final ok = await _subirRegistro(tabla, row);
           if (ok) {
             await d.update(tabla, {'sync_status': 'sincronizado'},
@@ -96,6 +100,8 @@ class SyncService extends ChangeNotifier {
           }
         }
       }
+    } catch (e) {
+      debugPrint('Error general de sincronización: $e');
     } finally {
       sincronizando = false;
       await refrescarPendientes();
