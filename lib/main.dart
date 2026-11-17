@@ -17,6 +17,12 @@ Future<void> main() async {
   final sync = SyncService();
   await auth.init();
   await sync.init();
+  if (auth.autenticado) {
+    sync.sincronizar();
+  }
+  auth.addListener(() {
+    if (auth.autenticado) sync.sincronizar();
+  });
   runApp(CalidadBerriesApp(auth: auth, sync: sync));
 }
 
