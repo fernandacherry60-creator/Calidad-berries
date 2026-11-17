@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../services/auth_service.dart';
 import 'register_screen.dart';
+import 'activar_duena_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -158,6 +159,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         MaterialPageRoute(
                             builder: (_) => const RegisterScreen())),
                     child: const Text('Crear cuenta con codigo de ingreso'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ActivarDuenaScreen())),
+                    child: const Text('Activar cuenta de la dueña'),
                   ),
                   const SizedBox(height: 24),
                   Text(
