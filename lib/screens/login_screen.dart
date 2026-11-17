@@ -56,27 +56,45 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Marca
                   Container(
-                    width: 84,
-                    height: 84,
-                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 22, vertical: 30),
                     decoration: BoxDecoration(
-                      color: AppColors.berry.withOpacity(0.1),
-                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, AppColors.primaryLight],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(26),
                     ),
-                    child: const Icon(Icons.spa_rounded,
-                        size: 44, color: AppColors.berry),
+                    child: Column(children: [
+                      Container(
+                        width: 82,
+                        height: 82,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: const Icon(Icons.spa_rounded,
+                            size: 48, color: Colors.white),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text('Calidad Berries',
+                        style: TextStyle(fontSize: 27,
+                          fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 6),
+                      const Text('Control de calidad en tus manos',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white, fontSize: 14)),
+                    ]),
                   ),
-                  const SizedBox(height: 20),
-                  Text('Calidad Berries',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineMedium),
-                  const SizedBox(height: 6),
-                  Text('Aseguramiento de calidad en campo',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 28),
+                  Text('Bienvenido de nuevo',
+                    style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 8),
+                  Text('Ingresa con tu cuenta para continuar.',
+                    style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 22),
                   TextFormField(
                     controller: _usuario,
                     autofillHints: const [AutofillHints.email],
@@ -129,7 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 24,
                             child: CircularProgressIndicator(
                                 strokeWidth: 2.5, color: Colors.white))
-                        : const Text('Entrar'),
+                        : const Row(mainAxisAlignment: MainAxisAlignment.center,
+                            children: [Icon(Icons.login_rounded, size: 21),
+                              SizedBox(width: 10), Text('Iniciar sesión')]),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton(
