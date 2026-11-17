@@ -134,59 +134,35 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<String?> cambiarPassword(String actual, String nueva) async {
-    if (_usuario == null) return 'Sin sesion';
-    if (nueva.length < 8) {
-      return 'La nueva contrasena debe tener al menos 8 caracteres';
+    if (Supabase.instance.client.auth.currentUser == null) return 'Sin sesión';
+    if (nueva.length < 8) return 'La contraseña debe tener al menos 8 caracteres';
+    try {
+      final email = Supabase.instance.client.auth.currentUser!.email;
+      if (email == null) return 'Correo no disponible';
+      await Supabase.instance.client.auth.signInWithPassword(
+          email: email, password: actual);
+      await Supabase.instance.client.auth.updateUser(
+          UserAttributes(password: nueva));
+      requiereCambioPassword = false;
+      notifyListeners();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
     }
-    final d = await AppDatabase.instance.db;
-    final rows = await d
-        .query('users', where: 'id = ?', whereArgs: [_usuario!.id], limit: 1);
-    final row = rows.first;
-    if (_hash(actual, row['salt'] as String) != row['password_hash']) {
-      return 'La contrasena actual no es correcta';
-    }
-    final salt = _nuevaSal();
-    await d.update(
-      'users',
-      {
-        'password_hash': _hash(nueva, salt),
-        'salt': salt,
-        'must_change_password': 0,
-      },
-      where: 'id = ?',
-      whereArgs: [_usuario!.id],
-    );
-    requiereCambioPassword = false;
-    notifyListeners();
-    return null;
   }
 
-  /// Define una contrasena nueva SIN pedir la actual.
-  ///
-  /// Solo se usa desde la pantalla de cambio obligatorio, a la que unicamente
-  /// se llega despues de un login valido (con la contrasena de fabrica o con
-  /// la temporal que genero el administrador). No es un atajo: la persona ya
-  /// demostro conocer una credencial vigente.
   Future<String?> definirPasswordObligatoria(String nueva) async {
-    if (_usuario == null) return 'Sin sesion';
-    if (nueva.length < 8) {
-      return 'La nueva contrasena debe tener al menos 8 caracteres';
+    if (Supabase.instance.client.auth.currentUser == null) return 'Sin sesión';
+    if (nueva.length < 8) return 'Mínimo 8 caracteres';
+    try {
+      await Supabase.instance.client.auth.updateUser(
+          UserAttributes(password: nueva));
+      requiereCambioPassword = false;
+      notifyListeners();
+      return null;
+    } on AuthException catch (e) {
+      return e.message;
     }
-    final d = await AppDatabase.instance.db;
-    final salt = _nuevaSal();
-    await d.update(
-      'users',
-      {
-        'password_hash': _hash(nueva, salt),
-        'salt': salt,
-        'must_change_password': 0,
-      },
-      where: 'id = ?',
-      whereArgs: [_usuario!.id],
-    );
-    requiereCambioPassword = false;
-    notifyListeners();
-    return null;
   }
 
   /// Restablece la contrasena de otra persona y devuelve una temporal.
@@ -195,38 +171,9 @@ class AuthService extends ChangeNotifier {
   /// telefono (la tabla users es local, no viaja a Supabase). La persona
   /// entra con la temporal y la app la obliga a definir una propia.
   /// Devuelve null si la operacion no es valida.
-  Future<String?> resetearPassword(int userId) async {
-    if (!(_usuario?.esAdmin ?? false)) return null;
-    if (userId == _usuario!.id) return null; // no sobre uno mismo
-    final d = await AppDatabase.instance.db;
-    final rows = await d.query('users',
-        where: 'id = ? AND active = 1', whereArgs: [userId], limit: 1);
-    if (rows.isEmpty) return null;
-
-    final temporal = _passwordTemporal();
-    final salt = _nuevaSal();
-    await d.update(
-      'users',
-      {
-        'password_hash': _hash(temporal, salt),
-        'salt': salt,
-        'must_change_password': 1,
-      },
-      where: 'id = ?',
-      whereArgs: [userId],
-    );
-    return temporal;
-  }
-
-  /// Contrasena temporal legible: 'Temp-' + 6 caracteres sin ambiguedades.
-  /// Son 11 caracteres, por encima del minimo de 8 que exige la app.
-  String _passwordTemporal() {
-    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-    final rnd = Random.secure();
-    final cuerpo =
-        List.generate(6, (_) => chars[rnd.nextInt(chars.length)]).join();
-    return 'Temp-$cuerpo';
-  }
+  // Las contraseñas de Supabase no se restablecen desde SQLite.
+  // Se debe usar el flujo de recuperación por correo.
+  Future<String?> resetearPassword(int userId) async => null;
 
   // ---- codigos de ingreso (solo admin) ----
 
