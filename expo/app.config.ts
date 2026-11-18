@@ -14,13 +14,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: ['expo-secure-store', 'expo-sqlite', 'expo-updates'],
   runtimeVersion: { policy: 'appVersion' },
   updates: {
-    url: process.env.EXPO_PUBLIC_EAS_PROJECT_ID
-      ? `https://u.expo.dev/${process.env.EXPO_PUBLIC_EAS_PROJECT_ID}`
-      : undefined,
+    url: `https://u.expo.dev/5a29290a-a0bb-41a2-8441-a6f19dd75b70`,
     checkAutomatically: 'ON_LOAD',
     fallbackToCacheTimeout: 0,
   },
   extra: {
-    eas: { projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || undefined },
+    eas: { projectId: '5a29290a-a0bb-41a2-8441-a6f19dd75b70' },
   },
 });
