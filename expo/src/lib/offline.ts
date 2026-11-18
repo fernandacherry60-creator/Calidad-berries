@@ -5,11 +5,9 @@ import { supabase, type Profile } from './cloud';
 export type TableName = 'muestreos_anden' | 'muestreos_proceso' | 'semaforo';
 export type LocalSample = { uuid: string; owner_id: string; table_name: TableName; payload: string; fecha: string; synced: number };
 export type PendingInvite = { email: string; code: string; name: string; puesto: string };
-let dbPromise: ReturnType<typeof SQLite.openDatabaseAsync> | null = null;
-async function db() {
-  if (!dbPromise) {
-    dbPromise = SQLite.openDatabaseAsync('calidad_berries_pro_expo.db');
-    const connection = await dbPromise;
+let dbPromise: ReturnType<typeof initializeDatabase> | null = null;
+async function initializeDatabase() {
+    const connection = await SQLite.openDatabaseAsync('calidad_berries_pro_expo.db');
     await connection.execAsync(`
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS samples(
@@ -22,7 +20,10 @@ async function db() {
       );
       CREATE INDEX IF NOT EXISTS samples_owner_pending ON samples(owner_id,synced);
     `);
-  }
+    return connection;
+}
+async function db() {
+  if (!dbPromise) dbPromise = initializeDatabase().catch(error => { dbPromise = null; throw error; });
   return dbPromise;
 }
 export async function cacheVerifiedProfile(p: Profile) {
