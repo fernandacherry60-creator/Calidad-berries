@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://zcwtlremnqkptjzlnpao.supabase.co';
-const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '';
+const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_ZaOo-I-NZo-Gx8UeT_k4Qg_GLFNEJhT';
 if (!key) console.warn('Configura EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
 
 const storage = {
