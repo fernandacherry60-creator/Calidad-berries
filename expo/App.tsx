@@ -33,6 +33,7 @@ export default function App() {
   const [userId,setUserId]=useState<string|null>(null);
   const [busy,setBusy]=useState(true);
   const [screen,setScreen]=useState<Screen>('home');
+  const [panel,setPanel]=useState<'admin'|'worker'>('admin');
   const [pending,setPending]=useState(0);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
   const refresh=useCallback(async()=>{
@@ -86,11 +87,14 @@ export default function App() {
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout}/>;
   const navigate=(next:Screen)=>setScreen(next);
+  const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
+  const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
   return <View style={styles.page}>
-    <View style={styles.top}><Text style={styles.topTitle}>Calidad Berries Pro</Text><Text style={styles.topSmall}>{profile.display_name} · {profile.role==='admin'?'Administradora':'Trabajador'}</Text></View>
+    <View style={styles.top}><Text style={styles.topTitle}>Calidad Berries Pro</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
     <ScrollView contentContainerStyle={styles.body}>
       {screen!=='home'&&<Pressable onPress={()=>navigate('home')}><Text style={styles.back}>‹ Volver al inicio</Text></Pressable>}
       {screen==='home'&&<>
+        {dualPanel&&<Choice label="Panel de trabajo" options={['Administradora','Trabajadora']} value={panel==='admin'?'Administradora':'Trabajadora'} onChange={v=>setPanel(v==='Administradora'?'admin':'worker')}/>}
         <Text style={styles.heading}>Control de calidad</Text>
         <Text style={styles.subtitle}>Captura offline y sincronización segura con Supabase</Text>
         <View style={styles.card}><Text style={styles.label}>Registros pendientes en este teléfono</Text><Text style={styles.big}>{pending}</Text>
@@ -98,10 +102,10 @@ export default function App() {
         {features.enable_sampling!==false&&<><Button title="Nuevo muestreo de andén" onPress={()=>navigate('anden')}/><Button title="Nuevo muestreo de proceso" onPress={()=>navigate('proceso')}/></>}
         {features.enable_semaforo!==false&&<Button title="Nuevo semáforo" onPress={()=>navigate('semaforo')}/>}
         <Button title="Historial de este teléfono" onPress={()=>navigate('history')}/>
-        {profile.role==='admin'&&<Button title="Trabajadores y muestreos en la nube" onPress={()=>navigate('team')}/>}
+        {adminPanel&&<Button title="Trabajadores y muestreos en la nube" onPress={()=>navigate('team')}/>}
         <Pressable onPress={logout}><Text style={styles.logout}>Cerrar sesión</Text></Pressable>
       </>}
-      {screen==='team'&&profile.role==='admin'&&<TeamView/>}
+      {screen==='team'&&adminPanel&&<TeamView/>}
       {screen==='history'&&<HistoryView profile={profile}/>}
       {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} onSaved={async()=>{setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
