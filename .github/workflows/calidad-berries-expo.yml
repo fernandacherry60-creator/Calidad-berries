@@ -7,7 +7,7 @@ on:
       - 'expo/**'
       - '.github/workflows/calidad-berries-expo.yml'
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: expo-validation-${{ github.ref }}
   cancel-in-progress: true
@@ -22,22 +22,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Generar lockfile reproducible
-        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Guardar package-lock.json en main
-        if: github.ref == 'refs/heads/main'
-        run: |
-          if ! git diff --quiet -- expo/package-lock.json || [ ! -f expo/package-lock.json ] || ! git ls-files --error-unmatch expo/package-lock.json >/dev/null 2>&1; then
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add expo/package-lock.json
-            git diff --cached --quiet || git commit -m 'chore(expo): commit npm lockfile for EAS and Expo Doctor'
-            git push origin HEAD:main
-          fi
-        working-directory: .
       - name: Instalar dependencias con lockfile
         run: npm ci --no-audit --no-fund
       - name: Verificar TypeScript
         run: npx tsc --noEmit
-      - name: Comprobar Expo
-        run: npx expo config --type public
+      - name: Comprobar Expo Doctor
+        run: npx expo-doctor
+      - name: Comprobar Expo config y EAS projectId
+        run: |
+          npx expo config --type public
+          npx expo config --json | node -e "let s='';process.stdin.on('data',x=>s+=x);process.stdin.on('end',()=>{const c=JSON.parse(s);if(c.extra?.eas?.projectId!=='5a29290a-a0bb-41a2-8441-a6f19dd75b70')process.exit(1)})"
