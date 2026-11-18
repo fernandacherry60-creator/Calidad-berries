@@ -123,7 +123,7 @@ function AuthView({userId,onDone,onLogout}:{userId:string|null;onDone:()=>Promis
         if(error)throw error;
         await onDone();
       }else if(mode==='owner'){
-        if(email.trim().toLowerCase()!=='fernanda.var.pre@gmail.com')throw new Error('Solo se permite activar el correo autorizado de Fernanda');
+        if(!['fernanda.var.pre@gmail.com','yamilethklunder@gmail.com'].includes(email.trim().toLowerCase()))throw new Error('Este correo no está autorizado para registrar una cuenta administradora');
         const {error}=await supabase.auth.signUp({email:email.trim().toLowerCase(),password,
           options:{emailRedirectTo:'calidadberriespro://auth-callback'}});
         if(error)throw error;
