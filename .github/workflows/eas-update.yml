@@ -1,0 +1,49 @@
+name: Publicar actualización OTA a Expo Preview
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'expo/**'
+      - '.github/workflows/eas-update.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: eas-update-preview
+  cancel-in-progress: true
+
+jobs:
+  update-preview:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: expo
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      CI: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: expo/package-lock.json
+      - name: Check deployment credentials
+        run: |
+          if [ -z "$EXPO_TOKEN" ] || [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] || [ -z "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::Configure EXPO_TOKEN, EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY in GitHub Actions secrets."
+            exit 1
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate TypeScript
+        run: npx tsc --noEmit
+      - name: Install EAS CLI
+        run: npm install --global eas-cli
+      - name: Publish preview OTA update
+        run: eas update --branch preview --message "Calidad Berries Pro: diseño rojo y dorado, módulos de calidad" --non-interactive
