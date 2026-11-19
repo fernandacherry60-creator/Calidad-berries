@@ -276,7 +276,9 @@ function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';p
   const [presentacion,setPresentacion]=useState(presentaciones[0].name),[cuadrilla,setCuadrilla]=useState('');
   const [cajas,setCajas]=useState('0'),[taras,setTaras]=useState('0'),[frutos,setFrutos]=useState('100');
   const [larvas,setLarvas]=useState('0'),[peso,setPeso]=useState(''),[brix,setBrix]=useState('');
-  const [licencia,setLicencia]=useState(''),[embaladora,setEmbaladora]=useState(''),[nota,setNota]=useState('');
+  const [embaladora,setEmbaladora]=useState(''),[nota,setNota]=useState('');
+  const [empacable,setEmpacable]=useState('');
+  const [continueAnden,setContinueAnden]=useState(false);
   const [categoria,setCategoria]=useState('Condición'),[nivel,setNivel]=useState('ok');
   const [counts,setCounts]=useState<Record<string,string>>({});
   const [saving,setSaving]=useState(false);
@@ -300,14 +302,16 @@ function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';p
         if(Object.values(defectCounts).reduce((a,b)=>a+b,0)>total)throw new Error('Los defectos superan el total de frutos');
         const score=scoreAnden(defectCounts,total,larva);
         payload={uuid,fecha,cultivo:'Frambuesa',rancho,sector,variedad,presentacion,cuadrilla,
-          cajas_recibidas:box,canastos:canastosPorCajas(box),fruta_muestra:total,licencia,
+          cajas_recibidas:box,canastos:canastosPorCajas(box),fruta_muestra:total,
           grados_brix:brix?n(brix):null,peso:peso?n(peso):null,frutos_larva:larva,
           evaluador:profile.display_name,muestreados:embaladora,defectos_json:defectCounts,
           ...score,motivo:nota,...identity(profile)};
         table='muestreos_anden';
       }else if(kind==='proceso'){
         if(Object.values(defectCounts).reduce((a,b)=>a+b,0)>total)throw new Error('Los defectos superan el total de frutos');
-        const score=scoreProceso(defectCounts,total,box,t);
+        const manual=empacable.trim()===''?undefined:Number(empacable.replace(',','.'));
+        if(manual!==undefined&&(!Number.isFinite(manual)||manual<0||manual>100))throw new Error('El porcentaje empacable debe estar entre 0 y 100');
+        const score=scoreProceso(defectCounts,total,box,t,manual);
         payload={uuid,fecha,cultivo:'Frambuesa',frutos_muestra:total,rancho,cajas:box,taras:t,...score,...identity(profile)};
         table='muestreos_proceso';
       }else{
@@ -316,22 +320,26 @@ function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';p
       }
       await saveSample(table,payload,profile.user_id);
       Alert.alert('Guardado','Registro almacenado en el teléfono. Se sincronizará al tener conexión.');
-      await onSaved();
+      if(kind==='anden'&&continueAnden){
+        setCounts({});setLarvas('0');setPeso('');setBrix('');setNota('');
+        // Mantener rancho, sector, variedad, presentación, cuadrilla y embaladora.
+      }else await onSaved();
     }catch(e){Alert.alert('Revisar captura',errorMessage(e));}finally{setSaving(false);}
   }
   return <><Text style={styles.heading}>{kind==='anden'?'Muestreo de andén':kind==='proceso'?'Muestreo de proceso':'Semáforo'}</Text>
     <Text style={styles.subtitle}>Frambuesa · captura segura sin conexión</Text>
     {kind==='semaforo'?<><Input label="Categoría" value={categoria} onChange={setCategoria}/><Choice label="Nivel" options={['ok','warn','danger']} value={nivel} onChange={setNivel}/><Input label="Observaciones" value={nota} onChange={setNota}/></>:<>
       <Choice label="Rancho" options={ranchos} value={rancho} onChange={setRancho}/>
-      {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Choice label="Variedad" options={variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Licencia" value={licencia} onChange={setLicencia}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Grados Brix" value={brix} onChange={setBrix} keyboard="numeric"/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
+      {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Choice label="Variedad" options={variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Grados Brix" value={brix} onChange={setBrix} keyboard="numeric"/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
       <Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric"/>
-      {kind==='proceso'&&<Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric"/>}
+      {kind==='proceso'&&<><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric"/><Text style={styles.notice}>Cada tara equivale a 3 kg.</Text><Input label="Potencial empacable (%) · dato manual opcional" value={empacable} onChange={setEmpacable} keyboard="numeric"/></>}
       <Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric"/>
       {kind==='anden'&&<Text style={styles.notice}>Canastos sugeridos: {canastosPorCajas(n(cajas))} (1 por cada 24 cajas o fracción)</Text>}
       <Text style={styles.section}>Defectos encontrados</Text>
       {defects.map(d=><Input key={d.key} label={d.label+' · '+d.category} value={counts[d.key]||'0'} onChange={v=>setCounts(prev=>({...prev,[d.key]:v}))} keyboard="numeric"/>)}
       {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
     </>}
+    {kind==='anden'&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
     <Button title={saving?'Guardando…':'Guardar muestreo sin conexión'} disabled={saving} onPress={save}/>
   </>;
 }
