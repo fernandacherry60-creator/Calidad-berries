@@ -2,7 +2,7 @@ import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Calidad Berries Pro',
+  name: 'QUALYX Pro',
   slug: 'klunder-tropi',
   owner: 'tropicas-team',
   scheme: 'calidadberriespro',
