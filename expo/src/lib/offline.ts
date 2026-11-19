@@ -53,6 +53,25 @@ export async function saveSample(table: TableName, payload: Record<string, unkno
     [String(payload.uuid),ownerId,table,JSON.stringify(payload),String(payload.fecha)],
   );
 }
+export async function updatePendingSample(uuid:string,ownerId:string,payload:Record<string,unknown>){
+  const connection=await db();
+  const result=await connection.runAsync('UPDATE samples SET payload=? WHERE uuid=? AND owner_id=? AND synced=0',[JSON.stringify(payload),uuid,ownerId]);
+  if(result.changes!==1)throw new Error('Solo se pueden modificar registros locales pendientes de sincronización.');
+}
+export async function updateSyncedSample(table:TableName,uuid:string,ownerId:string,changes:Record<string,unknown>){
+  if(table==='semaforo')throw new Error('Esta edición solo admite andén y proceso.');
+  const {data:{user},error:authError}=await supabase.auth.getUser();
+  if(authError||!user||user.id!==ownerId)throw new Error('Sesión no válida para editar el registro.');
+  const {data,error}=await supabase.from(table).update(changes).eq('uuid',uuid).eq('owner_id',ownerId).select('uuid').maybeSingle();
+  if(error)throw error;
+  if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
+  const connection=await db();
+  const row=await connection.getFirstAsync<LocalSample>('SELECT * FROM samples WHERE uuid=? AND owner_id=?',[uuid,ownerId]);
+  if(row){
+    const updated={...JSON.parse(row.payload),...changes};
+    await connection.runAsync('UPDATE samples SET payload=? WHERE uuid=? AND owner_id=?',[JSON.stringify(updated),uuid,ownerId]);
+  }
+}
 export async function pendingCount(ownerId: string) {
   const connection = await db();
   const result = await connection.getFirstAsync<{ total: number }>(
