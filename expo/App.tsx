@@ -418,7 +418,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
       }else if(kind==='proceso'){
         if(Object.values(defectCounts).reduce((a,b)=>a+b,0)>total)throw new Error('Los defectos superan el total de frutos');
         const manual=empacable.trim()===''?undefined:Number(empacable.replace(',','.'));
-        if(manual!==undefined&&(!Number.isFinite(manual)||manual<0||manual>100))throw new Error('El porcentaje empacable debe estar entre 0 y 100');
+        if(manual===undefined||!Number.isFinite(manual)||manual<0||manual>100)throw new Error('Captura el porcentaje empacable manualmente, entre 0 y 100');
         const score=scoreProceso(defectCounts,total,box,t,manual);
         payload={uuid,fecha,cultivo:'Frambuesa',frutos_muestra:total,rancho,cajas:box,taras:t,...score,...identity(profile)};
         table='muestreos_proceso';
@@ -452,7 +452,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
       <Choice label="Rancho" options={ranchos} value={rancho} onChange={setRancho}/>
       {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Choice label="Variedad" options={variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Grados Brix" value={brix} onChange={setBrix} keyboard="numeric"/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
       <Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric"/>
-      {kind==='proceso'&&<><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric"/><Text style={styles.notice}>Cada tara equivale a 3 kg.</Text><Input label="Potencial empacable (%) · dato manual opcional" value={empacable} onChange={setEmpacable} keyboard="numeric"/></>}
+      {kind==='proceso'&&<><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric"/><Text style={styles.notice}>Cada tara equivale a 3 kg.</Text><Input label="Potencial empacable (%) · captura obligatoria" value={empacable} onChange={setEmpacable} keyboard="numeric"/></>}
       <Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric"/>
       {kind==='anden'&&<Text style={styles.notice}>Canastos sugeridos: {canastosPorCajas(n(cajas))} (1 por cada 24 cajas o fracción)</Text>}
       <Text style={styles.section}>Defectos encontrados</Text>
