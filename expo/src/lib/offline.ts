@@ -58,10 +58,11 @@ export async function updatePendingSample(uuid:string,ownerId:string,payload:Rec
   const result=await connection.runAsync('UPDATE samples SET payload=? WHERE uuid=? AND owner_id=? AND synced=0',[JSON.stringify(payload),uuid,ownerId]);
   if(result.changes!==1)throw new Error('Solo se pueden modificar registros locales pendientes de sincronización.');
 }
-export async function updateSyncedSample(table:TableName,uuid:string,ownerId:string,changes:Record<string,unknown>){
+export async function updateSyncedSample(table:TableName,uuid:string,ownerId:string,changes:Record<string,unknown>,profile:Profile){
   if(table==='semaforo')throw new Error('Esta edición solo admite andén y proceso.');
   const {data:{user},error:authError}=await supabase.auth.getUser();
-  if(authError||!user||user.id!==ownerId)throw new Error('Sesión no válida para editar el registro.');
+  if(authError||!user||user.id!==profile.user_id||!profile.active)throw new Error('Sesión no válida para editar el registro.');
+  if(user.id!==ownerId&&profile.role!=='admin')throw new Error('Solo la administradora puede modificar muestreos de otros trabajadores.');
   const {data,error}=await supabase.from(table).update(changes).eq('uuid',uuid).eq('owner_id',ownerId).select('uuid').maybeSingle();
   if(error)throw error;
   if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
