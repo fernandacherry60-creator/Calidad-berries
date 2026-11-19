@@ -311,7 +311,6 @@ function ReportsView(){
       const from=new Date();from.setHours(0,0,0,0);from.setDate(from.getDate()-(days-1));
       const results:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso'] as const){
-        let query=supabase.from(table).select('uuid,fecha,rancho,disposicion,pct_condicion,pct_apariencia,total_defectos,potencial_empacable').gte('fecha',from.toISOString()).order('fecha',{ascending:false}).limit(500);
         // Ambas tablas no comparten todas las columnas.
         const columns=table==='muestreos_anden'?'uuid,fecha,rancho,disposicion,pct_condicion,pct_apariencia':'uuid,fecha,rancho,total_defectos,potencial_empacable';
         let q=supabase.from(table).select(columns).gte('fecha',from.toISOString()).order('fecha',{ascending:false}).limit(500);
