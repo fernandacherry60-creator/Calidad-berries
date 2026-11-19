@@ -9,7 +9,7 @@
     "check": "tsc --noEmit",
     "doctor": "expo-doctor",
     "build": "eas build --platform android --profile preview",
-    "update": "eas update --branch production"
+    "update": "eas update --channel preview"
   },
   "dependencies": {
     "expo": "~54.0.0",
