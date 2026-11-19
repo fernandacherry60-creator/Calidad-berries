@@ -20,18 +20,21 @@ const errorMessage = (e:unknown) => e instanceof Error?e.message:String(e);
 const n = (v:string) => Number(v.replace(',','.'))||0;
 const nonNegative = (v:number) => Number.isFinite(v)&&v>=0;
 const identity = (profile:Profile) => ({usuario_email:profile.email,usuario_nombre:profile.display_name,usuario_puesto:profile.puesto});
-async function handleAuthLink(url:string) {
-  const query=url.includes('#')?url.split('#')[1]:url.split('?')[1]||'';
-  const params=new URLSearchParams(query);
+async function handleAuthLink(url:string):Promise<boolean> {
+  const params=new URLSearchParams([url.split('?')[1]?.split('#')[0]||'',url.split('#')[1]||''].filter(Boolean).join('&'));
+  const error=params.get('error_description');if(error)throw new Error(error);
+  const recovery=params.get('type')==='recovery';
   const access=params.get('access_token'),refresh=params.get('refresh_token'),code=params.get('code');
-  if(access&&refresh) await supabase.auth.setSession({access_token:access,refresh_token:refresh});
-  else if(code) await supabase.auth.exchangeCodeForSession(code);
+  if(access&&refresh){const {error}=await supabase.auth.setSession({access_token:access,refresh_token:refresh});if(error)throw error;}
+  else if(code){const {error}=await supabase.auth.exchangeCodeForSession(code);if(error)throw error;}
+  return recovery;
 }
 
 export default function App() {
   const [profile,setProfile]=useState<Profile|null>(null);
   const [userId,setUserId]=useState<string|null>(null);
   const [busy,setBusy]=useState(true);
+  const [recovering,setRecovering]=useState(false);
   const [screen,setScreen]=useState<Screen>('home');
   const [panel,setPanel]=useState<'admin'|'worker'>('admin');
   const [pending,setPending]=useState(0);
@@ -57,10 +60,10 @@ export default function App() {
   useEffect(()=>{
     let alive=true;
     (async()=>{try{
-      const initial=await Linking.getInitialURL();if(initial)await handleAuthLink(initial);
+      const initial=await Linking.getInitialURL();if(initial)setRecovering(await handleAuthLink(initial));
       await refresh();
     }catch(e){Alert.alert('Inicio',errorMessage(e));}finally{if(alive)setBusy(false);}})();
-    const link=Linking.addEventListener('url',({url})=>{handleAuthLink(url).then(refresh).catch(e=>Alert.alert('Enlace',errorMessage(e)));});
+    const link=Linking.addEventListener('url',({url})=>{handleAuthLink(url).then(async recovery=>{if(recovery)setRecovering(true);await refresh();}).catch(e=>Alert.alert('Enlace',errorMessage(e)));});
     const auth=supabase.auth.onAuthStateChange(()=>{setTimeout(()=>{refresh().catch(()=>{});},0);});
     return ()=>{alive=false;link.remove();auth.data.subscription.unsubscribe();};
   },[refresh]);
@@ -85,6 +88,7 @@ export default function App() {
   },[profile]);
   async function logout(){await supabase.auth.signOut();await clearCachedProfile();setProfile(null);setUserId(null);setScreen('home');}
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
+  if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
   const navigate=(next:Screen)=>setScreen(next);
   const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
@@ -151,24 +155,8 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
         }
         onPanel(selected);
         await onDone();
-      }else if(selected==='admin'){
-        if(!allowedAdminEmail(normalized))throw new Error('Este correo no está autorizado para registrar una cuenta administradora');
-        const {error}=await supabase.auth.signUp({email:normalized,password,
-          options:{emailRedirectTo:'calidadberriespro://auth-callback'}});
-        if(error)throw error;
-        Alert.alert('Verifica tu correo','Confirma el enlace recibido y después inicia sesión.');
-        setRegister(false);
-      }else{
-        if(code.trim().length!==12)throw new Error('El código debe tener 12 caracteres');
-        if(name.trim().length<2)throw new Error('Escribe tu nombre');
-        await savePending({email:normalized,code:code.trim().toUpperCase(),name:name.trim(),puesto});
-        const {data,error}=await supabase.auth.signUp({email:normalized,password,
-          options:{emailRedirectTo:'calidadberriespro://auth-callback'}});
-        if(error)throw error;
-        if(data.session)await redeemPendingInvitation(normalized);
-        Alert.alert('Verifica tu correo','Confirma tu correo y después inicia sesión con el panel de trabajador.');
-        setRegister(false);
       }
+
     }catch(e){Alert.alert('No se pudo continuar',errorMessage(e));}finally{setWorking(false);}
   }
   return <ScrollView contentContainerStyle={styles.entryPage} keyboardShouldPersistTaps="handled">
@@ -190,15 +178,11 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
           <Text style={styles.entryLoginTitle}>{selected==='admin'?'Panel de administrador':'Panel de trabajador'}</Text>
           <Text style={styles.entryLoginHint}>{register?'Completa los datos para activar tu acceso.':'Ingresa tu correo y contraseña para continuar.'}</Text>
           {userId&&<Text style={styles.notice}>Hay una sesión sin perfil activo. Confirma tu correo o cierra sesión.</Text>}
-          {register&&selected==='worker'&&<>
-            <Input label="Código de invitación (12 caracteres)" value={code} onChange={setCode}/>
-            <Input label="Nombre completo" value={name} onChange={setName}/>
-            <Choice label="Puesto" options={puestos} value={puesto} onChange={setPuesto}/>
-          </>}
+
           <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
           <Input label="Contraseña (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
-          <Button title={working?'Procesando…':register?'Crear cuenta':'Ingresar'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
-          <Pressable onPress={()=>setRegister(!register)} style={styles.entryRegister}><Text style={styles.entryRegisterText}>{register?'Ya tengo cuenta · Iniciar sesión':selected==='admin'?'Activar cuenta autorizada':'Tengo un código de invitación'}</Text></Pressable>
+          <Button title={working?'Procesando…':'Ingresar'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
+          <Pressable onPress={async()=>{const normalized=email.trim().toLowerCase();if(!normalized.includes('@')){Alert.alert('Recuperar acceso','Escribe primero tu correo electrónico.');return;}setWorking(true);try{const {error}=await supabase.auth.resetPasswordForEmail(normalized,{redirectTo:'calidadberriespro://auth-callback'});if(error)throw error;Alert.alert('Revisa tu correo','Abre el enlace de recuperación en este teléfono y escribe tu nueva contraseña en la aplicación.');}catch(e){Alert.alert('Recuperación',errorMessage(e));}finally{setWorking(false);}}} style={styles.entryRegister}><Text style={styles.entryRegisterText}>Olvidé mi contraseña</Text></Pressable>
           {userId&&<Button title="Cerrar sesión" onPress={onLogout}/>}
         </View>
       </>}
@@ -206,10 +190,28 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
     <Text style={styles.entryFooter}>CONTROL DE CALIDAD  ·  CALIDAD BERRIES PRO</Text>
   </ScrollView>;
 }
+function ResetPasswordView({onComplete}:{onComplete:()=>Promise<void>}){
+  const [password,setPassword]=useState('');
+  const [confirm,setConfirm]=useState('');
+  const [saving,setSaving]=useState(false);
+  return <ScrollView contentContainerStyle={styles.entryPage}><View style={styles.entryCenter}>
+    <Text style={styles.entryBrand}>Calidad Berries</Text><Text style={styles.entryBrandPro}>Pro</Text>
+    <View style={styles.entryLoginCard}><Text style={styles.entryLoginTitle}>Establecer contraseña nueva</Text>
+      <Text style={styles.entryLoginHint}>El enlace de recuperación ya abrió una sesión temporal. Guarda aquí tu nueva contraseña.</Text>
+      <Input label="Contraseña nueva (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
+      <Input label="Confirmar contraseña" value={confirm} onChange={setConfirm} secure/>
+      <Button title={saving?'Guardando…':'Guardar contraseña'} disabled={saving||password.length<8||password!==confirm} onPress={async()=>{
+        setSaving(true);try{const {error}=await supabase.auth.updateUser({password});if(error)throw error;Alert.alert('Contraseña actualizada','Ya puedes iniciar sesión con tu contraseña nueva.',[{text:'Continuar',onPress:()=>void onComplete()}]);}catch(e){Alert.alert('No se pudo actualizar',errorMessage(e));}finally{setSaving(false);}
+      }}/>
+    </View></View></ScrollView>;
+}
 function TeamView(){
   const [members,setMembers]=useState<Profile[]>([]);
   const [samples,setSamples]=useState<Record<string,unknown>[]>([]);
   const [invitation,setInvitation]=useState('');
+  const [workerEmail,setWorkerEmail]=useState('');
+  const [workerName,setWorkerName]=useState('');
+  const [workerPuesto,setWorkerPuesto]=useState(puestos[0]);
   const [loading,setLoading]=useState(false);
   const refresh=useCallback(async()=>{
     try{
@@ -228,18 +230,19 @@ function TeamView(){
   async function invite(){
     setLoading(true);
     try{
-      const {data:{user}}=await supabase.auth.getUser();if(!user)throw new Error('Inicia sesión');
-      const alphabet='ABCDEFGHJKMNPQRSTUVWXYZ23456789';
-      const bytes=await Crypto.getRandomBytesAsync(12);
-      const code=Array.from(bytes,b=>alphabet[b%alphabet.length]).join('');
-      const {error}=await supabase.from('cb_invitations').insert({
-        code,created_by:user.id,expires_at:new Date(Date.now()+7*86400000).toISOString(),
-      });
-      if(error)throw error;setInvitation(code);
+      const {data,error}=await supabase.functions.invoke('cb-invite-worker',{body:{
+        email:workerEmail.trim().toLowerCase(),name:workerName.trim(),puesto:workerPuesto
+      }});
+      if(error)throw error;
+      if(data?.error)throw new Error(data.error);
+      setInvitation(workerEmail.trim().toLowerCase());
+      setWorkerEmail('');setWorkerName('');
+      await refresh();
+      Alert.alert('Invitación enviada','El trabajador recibirá un correo para establecer su contraseña y activar su acceso.');
     }catch(e){Alert.alert('Invitación',errorMessage(e));}finally{setLoading(false);}
   }
-  return <><Text style={styles.heading}>Equipo y muestreos</Text><Button title="Actualizar" onPress={()=>void refresh()}/><Button title={loading?'Creando…':'Crear invitación (7 días)'} disabled={loading} onPress={invite}/>
-    {invitation!==''&&<View style={styles.card}><Text style={styles.label}>Código de un solo uso · compartir en privado</Text><Text selectable style={styles.big}>{invitation}</Text></View>}
+  return <><Text style={styles.heading}>Gestión de trabajadores</Text><Text style={styles.subtitle}>Solo la administradora puede enviar invitaciones. Cada trabajador establece su propia contraseña.</Text><Input label="Nombre completo" value={workerName} onChange={setWorkerName}/><Choice label="Puesto" options={puestos} value={workerPuesto} onChange={setWorkerPuesto}/><Input label="Correo del trabajador" value={workerEmail} onChange={setWorkerEmail} keyboard="email-address"/><Button title={loading?"Enviando…":"Enviar invitación por correo"} disabled={loading||workerName.trim().length<2||!workerEmail.includes("@")} onPress={invite}/><Button title="Actualizar lista" onPress={()=>void refresh()}/>
+    {invitation!==""&&<Text style={styles.notice}>Invitación enviada a {invitation}</Text>}
     <Text style={styles.section}>Personal ({members.length})</Text>
     {members.map(m=><View key={m.user_id} style={styles.card}><Text style={styles.label}>{m.display_name} · {m.role}</Text><Text>{m.email} · {m.puesto} · {m.active?'Activo':'Inactivo'}</Text></View>)}
     <Text style={styles.section}>Últimos muestreos en la nube</Text>
