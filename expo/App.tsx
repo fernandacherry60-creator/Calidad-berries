@@ -352,12 +352,12 @@ function ReportsView(){
     {topDefects.length===0&&<Text style={styles.notice}>No hay defectos registrados para el filtro seleccionado.</Text>}
     {topDefects.map(([label,value])=><View key={label} style={{marginBottom:12}}>
       <Text style={styles.label}>{label} · {value.toFixed(1)}</Text>
-      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:(value/maxDefect*100)+'%',backgroundColor:C.green,borderRadius:7}}/></View>
+      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:((value/maxDefect*100)+'%') as `${number}%`,backgroundColor:C.green,borderRadius:7}}/></View>
     </View>)}
     <Text style={styles.section}>Gráfica de muestreos por día</Text>
     {trend.map(([day,value])=><View key={day} style={{marginBottom:10}}>
       <Text style={styles.label}>{day} · {value} muestreos</Text>
-      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:(value/maxDaily*100)+'%',backgroundColor:C.green,borderRadius:7}}/></View>
+      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:((value/maxDaily*100)+'%') as `${number}%`,backgroundColor:C.green,borderRadius:7}}/></View>
     </View>)}
     {rows.map((r,i)=><View key={String(r.uuid)+String(i)} style={styles.card}><Text>{r.tabla==='muestreos_anden'?'Andén':'Proceso'} · {String(r.rancho)}</Text><Text>{String(r.fecha).slice(0,10)} · {String(r.disposicion||('Empacable '+Number(r.potencial_empacable||0).toFixed(1)+'%'))}</Text></View>)}
   </>;
@@ -432,7 +432,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         const changes={...payload,uuid:editing.uuid,fecha:editing.fecha};
         const updated={...original,...changes};
         if(editing.synced){
-          const {uuid:_uuid,fecha:_fecha,owner_id:_owner,...fields}=changes;
+          const {uuid:_uuid,fecha:_fecha,owner_id:_owner,usuario_email:_email,usuario_nombre:_nombre,usuario_puesto:_puesto,evaluador:_evaluador,...fields}=changes;
           await updateSyncedSample(table,editing.uuid,editing.owner_id,fields,profile);
         }else await updatePendingSample(editing.uuid,profile.user_id,updated);
         Alert.alert('Actualizado','El muestreo se modificó correctamente.');
