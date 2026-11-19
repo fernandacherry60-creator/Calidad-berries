@@ -314,7 +314,7 @@ function ReportsView(){
       const results:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso'] as const){
         // Ambas tablas no comparten todas las columnas.
-        const columns=table==='muestreos_anden'?'uuid,fecha,rancho,disposicion,pct_condicion,pct_apariencia':'uuid,fecha,rancho,total_defectos,potencial_empacable';
+        const columns=table==='muestreos_anden'?'uuid,fecha,rancho,disposicion,pct_condicion,pct_apariencia,defectos_json':'uuid,fecha,rancho,total_defectos,potencial_empacable,defectos_json';
         let q=supabase.from(table).select(columns).gte('fecha',from.toISOString()).order('fecha',{ascending:false}).limit(500);
         if(rancho!=='Todos')q=q.eq('rancho',rancho);
         const {data,error}=await q;
@@ -327,12 +327,38 @@ function ReportsView(){
   const anden=rows.filter(r=>r.tabla==='muestreos_anden'),proceso=rows.filter(r=>r.tabla==='muestreos_proceso');
   const rejected=anden.filter(r=>r.disposicion==='RECHAZO').length;
   const avg=proceso.length?proceso.reduce((s,r)=>s+Number(r.potencial_empacable||0),0)/proceso.length:0;
+  const defectTotals:Record<string,number>={};
+  for(const r of rows){
+    const values=(r.defectos_json||{}) as Record<string,number>;
+    for(const [key,value] of Object.entries(values)){
+      if(key==='Fruta buena')continue;
+      const label=(r.tabla==='muestreos_anden'?'Andén: ':'Proceso: ')+key;
+      defectTotals[label]=(defectTotals[label]||0)+Number(value||0);
+    }
+  }
+  const topDefects=Object.entries(defectTotals).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const maxDefect=Math.max(1,...topDefects.map(x=>x[1]));
+  const daily:Record<string,number>={};
+  for(const r of rows){const day=String(r.fecha).slice(0,10);daily[day]=(daily[day]||0)+1;}
+  const trend=Object.entries(daily).sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxDaily=Math.max(1,...trend.map(x=>x[1]));
   return <><Text style={styles.heading}>Informes de calidad</Text>
     <Choice label="Periodo" options={['Hoy','7 días','30 días']} value={period} onChange={setPeriod}/>
     <Choice label="Rancho" options={['Todos',...ranchos]} value={rancho} onChange={setRancho}/>
     <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/>
     <View style={styles.card}><Text style={styles.label}>Andenes: {anden.length} · Rechazos: {rejected}</Text>
       <Text style={styles.label}>Proceso: {proceso.length} · Potencial empacable promedio: {avg.toFixed(1)}%</Text></View>
+    <Text style={styles.section}>Gráfica de defectos más frecuentes</Text>
+    {topDefects.length===0&&<Text style={styles.notice}>No hay defectos registrados para el filtro seleccionado.</Text>}
+    {topDefects.map(([label,value])=><View key={label} style={{marginBottom:12}}>
+      <Text style={styles.label}>{label} · {value.toFixed(1)}</Text>
+      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:(value/maxDefect*100)+'%',backgroundColor:C.green,borderRadius:7}}/></View>
+    </View>)}
+    <Text style={styles.section}>Gráfica de muestreos por día</Text>
+    {trend.map(([day,value])=><View key={day} style={{marginBottom:10}}>
+      <Text style={styles.label}>{day} · {value} muestreos</Text>
+      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:(value/maxDaily*100)+'%',backgroundColor:C.green,borderRadius:7}}/></View>
+    </View>)}
     {rows.map((r,i)=><View key={String(r.uuid)+String(i)} style={styles.card}><Text>{r.tabla==='muestreos_anden'?'Andén':'Proceso'} · {String(r.rancho)}</Text><Text>{String(r.fecha).slice(0,10)} · {String(r.disposicion||('Empacable '+Number(r.potencial_empacable||0).toFixed(1)+'%'))}</Text></View>)}
   </>;
 }
