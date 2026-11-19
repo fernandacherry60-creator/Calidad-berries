@@ -85,7 +85,7 @@ export default function App() {
   },[profile]);
   async function logout(){await supabase.auth.signOut();await clearCachedProfile();setProfile(null);setUserId(null);setScreen('home');}
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
-  if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout}/>;
+  if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
   const navigate=(next:Screen)=>setScreen(next);
   const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
@@ -111,69 +111,99 @@ export default function App() {
     </ScrollView>
   </View>;
 }
-function AuthView({userId,onDone,onLogout}:{userId:string|null;onDone:()=>Promise<void>;onLogout:()=>Promise<void>}) {
-  const [mode,setMode]=useState<'login'|'owner'|'worker'>('login');
+function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()=>Promise<void>;onLogout:()=>Promise<void>;onPanel:(v:'admin'|'worker')=>void}) {
+  const [selected,setSelected]=useState<'admin'|'worker'|null>(null);
+  const [register,setRegister]=useState(false);
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [name,setName]=useState('');
   const [puesto,setPuesto]=useState(puestos[0]);
   const [code,setCode]=useState('');
   const [working,setWorking]=useState(false);
+  const allowedAdminEmail=(value:string)=>['fernanda.var.pre@gmail.com','yamilethklunder@gmail.com'].includes(value);
   async function submit(){
+    if(!selected)return;
     setWorking(true);
     try{
-      if(mode==='login'){
-        const {error}=await supabase.auth.signInWithPassword({email:email.trim().toLowerCase(),password});
+      const normalized=email.trim().toLowerCase();
+      if(!register){
+        const {data,error}=await supabase.auth.signInWithPassword({email:normalized,password});
         if(error)throw error;
+        const signedUser=data.user;
+        if(!signedUser)throw new Error('No se pudo verificar la cuenta');
+        let verified=await loadProfile(signedUser.id);
+        if(!verified&&selected==='worker'){
+          await redeemPendingInvitation(normalized);
+          verified=await loadProfile(signedUser.id);
+        }
+        if(!verified?.active){
+          await supabase.auth.signOut();
+          throw new Error('Tu cuenta aún no tiene un perfil activo. Confirma tu correo o solicita una invitación.');
+        }
+        const dual=verified.role==='admin'&&normalized==='yamilethklunder@gmail.com';
+        if(selected==='admin'&&verified.role!=='admin'){
+          await supabase.auth.signOut();
+          throw new Error('Esta cuenta no tiene permiso para el panel de administrador.');
+        }
+        if(selected==='worker'&&verified.role!=='trabajador'&&!dual){
+          await supabase.auth.signOut();
+          throw new Error('Esta cuenta no tiene permiso para el panel de trabajador.');
+        }
+        onPanel(selected);
         await onDone();
-      }else if(mode==='owner'){
-        if(!['fernanda.var.pre@gmail.com','yamilethklunder@gmail.com'].includes(email.trim().toLowerCase()))throw new Error('Este correo no está autorizado para registrar una cuenta administradora');
-        const {error}=await supabase.auth.signUp({email:email.trim().toLowerCase(),password,
+      }else if(selected==='admin'){
+        if(!allowedAdminEmail(normalized))throw new Error('Este correo no está autorizado para registrar una cuenta administradora');
+        const {error}=await supabase.auth.signUp({email:normalized,password,
           options:{emailRedirectTo:'calidadberriespro://auth-callback'}});
         if(error)throw error;
         Alert.alert('Verifica tu correo','Confirma el enlace recibido y después inicia sesión.');
-        setMode('login');
+        setRegister(false);
       }else{
         if(code.trim().length!==12)throw new Error('El código debe tener 12 caracteres');
         if(name.trim().length<2)throw new Error('Escribe tu nombre');
-        const workerEmail=email.trim().toLowerCase();
-        await savePending({email:workerEmail,code:code.trim().toUpperCase(),name:name.trim(),puesto});
-        const {data,error}=await supabase.auth.signUp({email:workerEmail,password,
+        await savePending({email:normalized,code:code.trim().toUpperCase(),name:name.trim(),puesto});
+        const {data,error}=await supabase.auth.signUp({email:normalized,password,
           options:{emailRedirectTo:'calidadberriespro://auth-callback'}});
         if(error)throw error;
-        if(data.session){await redeemPendingInvitation(workerEmail);await onDone();}
-        else Alert.alert('Verifica tu correo','Confirma el enlace, vuelve a iniciar sesión y se validará tu invitación.');
-        setMode('login');
+        if(data.session)await redeemPendingInvitation(normalized);
+        Alert.alert('Verifica tu correo','Confirma tu correo y después inicia sesión con el panel de trabajador.');
+        setRegister(false);
       }
     }catch(e){Alert.alert('No se pudo continuar',errorMessage(e));}finally{setWorking(false);}
   }
-  return <ScrollView contentContainerStyle={styles.authModern} keyboardShouldPersistTaps="handled">
-    <View style={styles.authHero}>
-      <View style={styles.authOrbLarge}/>
-      <View style={styles.authOrbSmall}/>
-      <View style={styles.authTopline}><View style={styles.authBrandMark}><Text style={styles.authBrandMarkText}>CB</Text></View><Text style={styles.authEdition}>CALIDAD BERRIES  /  PRO</Text></View>
-      <View style={styles.authHeroContent}>
-        <Text style={styles.authEyebrow}>PLATAFORMA DE CONTROL DE CALIDAD</Text>
-        <Text style={styles.authHeroTitle}>Cada muestra.{"\n"}Una mejor cosecha.</Text>
-        <Text style={styles.authHeroDesc}>Supervisa, registra y consulta tus procesos con precisión, desde cualquier lugar.</Text>
-        <View style={styles.authHeroTags}><Text style={styles.authHeroTag}>●  Muestreos</Text><Text style={styles.authHeroTag}>●  Trazabilidad</Text><Text style={styles.authHeroTag}>●  Equipo</Text></View>
-      </View>
+  return <ScrollView contentContainerStyle={styles.entryPage} keyboardShouldPersistTaps="handled">
+    <View style={styles.entryCenter}>
+      <View style={styles.entryCherry}><Text style={styles.entryCherryText}>🍒</Text></View>
+      <Text style={styles.entryBrand}>Calidad Berries</Text>
+      <Text style={styles.entryBrandPro}>Pro</Text>
+      <View style={styles.entryRule}/>
+      {selected===null?<>
+        <Pressable style={styles.entryPrimary} onPress={()=>{setSelected('admin');setRegister(false);}}>
+          <Text style={styles.entryPrimaryText}>Panel de administrador</Text>
+        </Pressable>
+        <Pressable style={styles.entrySecondary} onPress={()=>{setSelected('worker');setRegister(false);}}>
+          <Text style={styles.entrySecondaryText}>Panel de trabajador</Text>
+        </Pressable>
+      </>:<>
+        <Pressable onPress={()=>{setSelected(null);setRegister(false);setPassword('');}} style={styles.entryBack}><Text style={styles.entryBackText}>‹ Elegir otro panel</Text></Pressable>
+        <View style={styles.entryLoginCard}>
+          <Text style={styles.entryLoginTitle}>{selected==='admin'?'Panel de administrador':'Panel de trabajador'}</Text>
+          <Text style={styles.entryLoginHint}>{register?'Completa los datos para activar tu acceso.':'Ingresa tu correo y contraseña para continuar.'}</Text>
+          {userId&&<Text style={styles.notice}>Hay una sesión sin perfil activo. Confirma tu correo o cierra sesión.</Text>}
+          {register&&selected==='worker'&&<>
+            <Input label="Código de invitación (12 caracteres)" value={code} onChange={setCode}/>
+            <Input label="Nombre completo" value={name} onChange={setName}/>
+            <Choice label="Puesto" options={puestos} value={puesto} onChange={setPuesto}/>
+          </>}
+          <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
+          <Input label="Contraseña (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
+          <Button title={working?'Procesando…':register?'Crear cuenta':'Ingresar'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
+          <Pressable onPress={()=>setRegister(!register)} style={styles.entryRegister}><Text style={styles.entryRegisterText}>{register?'Ya tengo cuenta · Iniciar sesión':selected==='admin'?'Activar cuenta autorizada':'Tengo un código de invitación'}</Text></Pressable>
+          {userId&&<Button title="Cerrar sesión" onPress={onLogout}/>}
+        </View>
+      </>}
     </View>
-    <View style={styles.authContent}>
-      <Text style={styles.authWelcome}>{mode==='login'?'Bienvenida de nuevo':mode==='owner'?'Activar acceso administrativo':'Únete al equipo'}</Text>
-      <Text style={styles.authLead}>{mode==='login'?'Ingresa tus credenciales para continuar.':mode==='owner'?'Registra tu correo autorizado y confirma el enlace que recibirás.':'Completa tus datos y utiliza el código de invitación proporcionado por tu administradora.'}</Text>
-      {userId&&<Text style={styles.notice}>Hay una sesión sin perfil activo. Confirma tu correo o canjea tu invitación. También puedes cerrar sesión.</Text>}
-      <View style={styles.authForm}>
-        <Choice label="Tipo de acceso" options={['Iniciar sesión','Administradora','Trabajador']} value={mode==='login'?'Iniciar sesión':mode==='owner'?'Administradora':'Trabajador'}
-          onChange={v=>setMode(v==='Iniciar sesión'?'login':v==='Administradora'?'owner':'worker')}/>
-        {mode==='worker'&&<><Input label="Código de invitación (12 caracteres)" value={code} onChange={setCode}/><Input label="Nombre completo" value={name} onChange={setName}/><Choice label="Puesto" options={puestos} value={puesto} onChange={setPuesto}/></>}
-        <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
-        <Input label="Contraseña (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
-        <Button title={working?'Procesando…':mode==='login'?'Entrar a mi espacio':mode==='owner'?'Activar mi cuenta':'Crear cuenta'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
-        {userId&&<Button title="Cerrar sesión" onPress={onLogout}/>}
-      </View>
-      <Text style={styles.authFooter}>CALIDAD BERRIES PRO  ·  CONTROL Y TRAZABILIDAD</Text>
-    </View>
+    <Text style={styles.entryFooter}>CONTROL DE CALIDAD  ·  CALIDAD BERRIES PRO</Text>
   </ScrollView>;
 }
 function TeamView(){
@@ -292,6 +322,25 @@ const styles=StyleSheet.create({
   topTitle:{fontSize:23,fontWeight:'800',color:C.white},topSmall:{color:'#D9F2E4',marginTop:5},
   center:{flex:1,alignItems:'center',justifyContent:'center'},
   auth:{flexGrow:1,justifyContent:'center',padding:24,backgroundColor:C.cream},
+  entryPage:{flexGrow:1,justifyContent:'space-between',paddingHorizontal:28,paddingTop:60,paddingBottom:30,backgroundColor:'#F9F8F3'},
+  entryCenter:{flex:1,justifyContent:'center',alignItems:'center',width:'100%',maxWidth:460,alignSelf:'center'},
+  entryCherry:{height:92,width:92,borderRadius:46,backgroundColor:'#FDE9E8',alignItems:'center',justifyContent:'center',marginBottom:16},
+  entryCherryText:{fontSize:52},
+  entryBrand:{fontSize:43,fontStyle:'italic',fontFamily:'serif',fontWeight:'700',color:'#245D43',textAlign:'center',letterSpacing:-1},
+  entryBrandPro:{fontSize:32,fontStyle:'italic',fontFamily:'serif',color:'#B44352',marginTop:-6,textAlign:'center'},
+  entryRule:{width:65,height:2,backgroundColor:'#C9B991',marginTop:23,marginBottom:34},
+  entryPrimary:{backgroundColor:'#286D4D',paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center',marginBottom:14},
+  entryPrimaryText:{color:'#FFFFFF',fontSize:17,fontWeight:'800'},
+  entrySecondary:{backgroundColor:'#FFFFFF',borderColor:'#BBD0C0',borderWidth:1.5,paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center'},
+  entrySecondaryText:{color:'#286D4D',fontSize:17,fontWeight:'800'},
+  entryBack:{alignSelf:'flex-start',paddingVertical:10,marginBottom:8},
+  entryBackText:{color:'#286D4D',fontWeight:'700',fontSize:14},
+  entryLoginCard:{width:'100%',backgroundColor:'#FFFFFF',borderRadius:22,padding:20,borderWidth:1,borderColor:'#E3EAE2'},
+  entryLoginTitle:{fontSize:21,fontWeight:'800',color:'#244934',marginBottom:5},
+  entryLoginHint:{fontSize:13,color:'#687B70',marginBottom:20,lineHeight:19},
+  entryRegister:{alignItems:'center',padding:10},
+  entryRegisterText:{color:'#286D4D',fontWeight:'700',fontSize:13},
+  entryFooter:{textAlign:'center',fontSize:10,letterSpacing:1.3,color:'#8B988D',fontWeight:'700',marginTop:20},
   authModern:{flexGrow:1,backgroundColor:'#F4F7F3'},
   authHero:{minHeight:320,backgroundColor:'#153E30',paddingHorizontal:26,paddingTop:62,paddingBottom:30,overflow:'hidden',position:'relative'},
   authOrbLarge:{position:'absolute',width:300,height:300,borderRadius:150,backgroundColor:'#245B43',right:-130,top:-80},
