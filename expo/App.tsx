@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase, loadProfile, redeemPendingInvitation, type Profile } from './src/lib/cloud';
-import { savePending, saveSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
+import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
 type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo'|'cultivos'|'calculadora'|'pesos'|'ayuda'|'informes';
@@ -47,6 +47,7 @@ export default function App() {
   const [busy,setBusy]=useState(true);
   const [recovering,setRecovering]=useState(false);
   const [screen,setScreen]=useState<Screen>('cultivos');
+  const [editing,setEditing]=useState<LocalSample|null>(null);
   const [panel,setPanel]=useState<'admin'|'worker'>('admin');
   const [pending,setPending]=useState(0);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
@@ -140,8 +141,8 @@ export default function App() {
       {screen==='pesos'&&<WeightsView/>}
       {screen==='ayuda'&&<HelpView/>}
       {screen==='informes'&&<ReportsView/>}
-      {screen==='history'&&<HistoryView profile={profile}/>}
-      {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} onSaved={async()=>{setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
+      {screen==='history'&&<HistoryView profile={profile} onEdit={row=>{setEditing(row);navigate(row.table_name==='muestreos_anden'?'anden':'proceso');}}/>}
+      {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
   </View>;
 }
@@ -334,13 +335,13 @@ function ReportsView(){
     {rows.map((r,i)=><View key={String(r.uuid)+String(i)} style={styles.card}><Text>{r.tabla==='muestreos_anden'?'Andén':'Proceso'} · {String(r.rancho)}</Text><Text>{String(r.fecha).slice(0,10)} · {String(r.disposicion||('Empacable '+Number(r.potencial_empacable||0).toFixed(1)+'%'))}</Text></View>)}
   </>;
 }
-function HistoryView({profile}:{profile:Profile}){
+function HistoryView({profile,onEdit}:{profile:Profile;onEdit:(row:LocalSample)=>void}){
   const [rows,setRows]=useState<LocalSample[]>([]);
   useEffect(()=>{void localSamples(profile.user_id).then(setRows).catch(e=>Alert.alert('Historial',errorMessage(e)));},[profile.user_id]);
   return <><Text style={styles.heading}>Historial local</Text>{rows.length===0&&<Text>Sin registros en este teléfono</Text>}
-    {rows.map(row=><View key={row.uuid} style={styles.card}><Text style={styles.label}>{row.table_name}</Text><Text>{row.fecha}</Text><Text style={{color:row.synced?C.green:C.danger}}>{row.synced?'Sincronizado':'Pendiente'}</Text></View>)}</>;
+    {rows.map(row=><View key={row.uuid} style={styles.card}><Text style={styles.label}>{row.table_name}</Text><Text>{row.fecha}</Text><Text style={{color:row.synced?C.green:C.danger}}>{row.synced?'Sincronizado':'Pendiente'}</Text>{row.table_name!=='semaforo'&&<Button title="Modificar muestreo" onPress={()=>onEdit(row)}/>}</View>)}</>;
 }
-function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';profile:Profile;onSaved:()=>Promise<void>}){
+function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'semaforo';profile:Profile;onSaved:()=>Promise<void>;editing:LocalSample|null}){
   const [rancho,setRancho]=useState(ranchos[0]),[sector,setSector]=useState(''),[variedad,setVariedad]=useState(variedades[0]);
   const [presentacion,setPresentacion]=useState(presentaciones[0].name),[cuadrilla,setCuadrilla]=useState('');
   const [cajas,setCajas]=useState('0'),[taras,setTaras]=useState('0'),[frutos,setFrutos]=useState('100');
@@ -352,6 +353,17 @@ function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';p
   const [counts,setCounts]=useState<Record<string,string>>({});
   const [saving,setSaving]=useState(false);
   const defects=kind==='anden'?andenDefects:procesoDefects;
+  useEffect(()=>{
+    if(!editing)return;
+    const p=JSON.parse(editing.payload) as Record<string,unknown>;
+    setRancho(String(p.rancho||ranchos[0]));setSector(String(p.sector||''));setVariedad(String(p.variedad||variedades[0]));
+    setPresentacion(String(p.presentacion||presentaciones[0].name));setCuadrilla(String(p.cuadrilla||''));
+    setCajas(String(p.cajas_recibidas??p.cajas??0));setTaras(String(p.taras??0));
+    setFrutos(String(p.fruta_muestra??p.frutos_muestra??100));setLarvas(String(p.frutos_larva??0));
+    setPeso(String(p.peso??''));setBrix(String(p.grados_brix??''));setEmbaladora(String(p.muestreados??''));
+    setNota(String(p.motivo??''));setCounts(Object.fromEntries(Object.entries((p.defectos_json||{}) as Record<string,number>).map(([k,v])=>[k,String(v)])));
+    setEmpacable(p.potencial_empacable==null?'':String(p.potencial_empacable));
+  },[editing]);
   async function save(){
     setSaving(true);
     try{
@@ -387,15 +399,27 @@ function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';p
         payload={uuid,fecha,cultivo:'Frambuesa',categoria,nivel,nota,...identity(profile)};
         table='semaforo';
       }
-      await saveSample(table,payload,profile.user_id);
-      Alert.alert('Guardado','Registro almacenado en el teléfono. Se sincronizará al tener conexión.');
-      if(kind==='anden'&&continueAnden){
+      if(editing){
+        // Preservar la identidad y la fecha originales para evitar duplicados.
+        const original=JSON.parse(editing.payload) as Record<string,unknown>;
+        const changes={...payload,uuid:editing.uuid,fecha:editing.fecha};
+        const updated={...original,...changes};
+        if(editing.synced){
+          const {uuid:_uuid,fecha:_fecha,owner_id:_owner,...fields}=changes;
+          await updateSyncedSample(table,editing.uuid,profile.user_id,fields);
+        }else await updatePendingSample(editing.uuid,profile.user_id,updated);
+        Alert.alert('Actualizado','El muestreo se modificó correctamente.');
+      }else{
+        await saveSample(table,payload,profile.user_id);
+        Alert.alert('Guardado','Registro almacenado en el teléfono. Se sincronizará al tener conexión.');
+      }
+      if(!editing&&kind==='anden'&&continueAnden){
         setCounts({});setLarvas('0');setPeso('');setBrix('');setNota('');
         // Mantener rancho, sector, variedad, presentación, cuadrilla y embaladora.
       }else await onSaved();
     }catch(e){Alert.alert('Revisar captura',errorMessage(e));}finally{setSaving(false);}
   }
-  return <><Text style={styles.heading}>{kind==='anden'?'Muestreo de andén':kind==='proceso'?'Muestreo de proceso':'Semáforo'}</Text>
+  return <><Text style={styles.heading}>{editing?'Modificar muestreo':kind==='anden'?'Muestreo de andén':kind==='proceso'?'Muestreo de proceso':'Semáforo'}</Text>
     <Text style={styles.subtitle}>Frambuesa · captura segura sin conexión</Text>
     {kind==='semaforo'?<><Input label="Categoría" value={categoria} onChange={setCategoria}/><Choice label="Nivel" options={['ok','warn','danger']} value={nivel} onChange={setNivel}/><Input label="Observaciones" value={nota} onChange={setNota}/></>:<>
       <Choice label="Rancho" options={ranchos} value={rancho} onChange={setRancho}/>
@@ -408,8 +432,8 @@ function CaptureView({kind,profile,onSaved}:{kind:'anden'|'proceso'|'semaforo';p
       {defects.map(d=><Input key={d.key} label={d.label+' · '+d.category} value={counts[d.key]||'0'} onChange={v=>setCounts(prev=>({...prev,[d.key]:v}))} keyboard="numeric"/>)}
       {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
     </>}
-    {kind==='anden'&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
-    <Button title={saving?'Guardando…':'Guardar muestreo sin conexión'} disabled={saving} onPress={save}/>
+    {kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
+    <Button title={saving?'Guardando…':editing?'Guardar modificaciones':'Guardar muestreo sin conexión'} disabled={saving} onPress={save}/>
   </>;
 }
 const styles=StyleSheet.create({
