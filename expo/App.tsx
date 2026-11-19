@@ -8,14 +8,14 @@ import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncS
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
 type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo'|'cultivos'|'calculadora'|'pesos'|'ayuda'|'informes';
-const C = { ink:'#24332D', green:'#28764C', cream:'#F8F7F2', muted:'#65766D', line:'#E3E8E2', white:'#FFFFFF', danger:'#B83C46' };
-const fieldStyle = { borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,backgroundColor:C.white,fontSize:15,color:C.ink } as const;
+const C = { ink:'#502027', green:'#A52A35', cream:'#FFF9F3', muted:'#80636A', line:'#E8CBA3', white:'#FFFFFF', danger:'#B71C32', gold:'#BD8A30', burgundy:'#651B2B' };
+const fieldStyle = { borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,backgroundColor:C.white,fontSize:15,color:C.ink,fontStyle:'italic' } as const;
 const Button = ({title,onPress,disabled=false}: {title:string;onPress:()=>void;disabled?:boolean}) =>
   <Pressable disabled={disabled} onPress={onPress} style={[styles.button,disabled&&{opacity:.5}]}><Text style={styles.buttonText}>{title}</Text></Pressable>;
 const Input = ({label,value,onChange,secure=false,keyboard='default'}: {label:string;value:string;onChange:(v:string)=>void;secure?:boolean;keyboard?:'default'|'numeric'|'email-address'}) =>
   <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><TextInput autoCapitalize={keyboard==='email-address'?'none':'sentences'} secureTextEntry={secure} keyboardType={keyboard} style={fieldStyle} value={value} onChangeText={onChange}/></View>;
 const Choice = ({label,options,value,onChange}: {label:string;options:string[];value:string;onChange:(v:string)=>void}) =>
-  <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><View style={styles.choices}>{options.map(v=><Pressable key={v} onPress={()=>onChange(v)} style={[styles.chip,value===v&&styles.selected]}><Text style={{color:value===v?C.white:C.ink}}>{v}</Text></Pressable>)}</View></View>;
+  <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><View style={styles.choices}>{options.map(v=><Pressable key={v} onPress={()=>onChange(v)} style={[styles.chip,value===v&&styles.selected]}><Text style={{color:value===v?C.white:C.ink,fontStyle:'italic'}}>{v}</Text></Pressable>)}</View></View>;
 const errorMessage = (e:unknown):string => {
   if(e instanceof Error)return e.message;
   if(typeof e==='string')return e;
@@ -352,7 +352,7 @@ function ReportsView(){
     {topDefects.length===0&&<Text style={styles.notice}>No hay defectos registrados para el filtro seleccionado.</Text>}
     {topDefects.map(([label,value])=><View key={label} style={{marginBottom:12}}>
       <Text style={styles.label}>{label} · {value.toFixed(1)}</Text>
-      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:((value/maxDefect*100)+'%') as `${number}%`,backgroundColor:C.green,borderRadius:7}}/></View>
+      <View style={{height:13,backgroundColor:C.line,borderRadius:7,overflow:'hidden'}}><View style={{height:13,width:((value/maxDefect*100)+'%') as `${number}%`,backgroundColor:C.gold,borderRadius:7}}/></View>
     </View>)}
     <Text style={styles.section}>Gráfica de muestreos por día</Text>
     {trend.map(([day,value])=><View key={day} style={{marginBottom:10}}>
@@ -465,61 +465,61 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
 }
 const styles=StyleSheet.create({
   page:{flex:1,backgroundColor:C.cream},body:{padding:20,paddingBottom:60},
-  top:{backgroundColor:C.green,paddingHorizontal:20,paddingTop:58,paddingBottom:20},
-  topTitle:{fontSize:23,fontWeight:'800',color:C.white},topSmall:{color:'#D9F2E4',marginTop:5},
+  top:{backgroundColor:C.burgundy,paddingHorizontal:20,paddingTop:58,paddingBottom:20},
+  topTitle:{fontStyle:'italic',fontFamily:'serif',fontSize:23,fontWeight:'800',color:C.white},topSmall:{color:'#FBE9CE',marginTop:5},
   center:{flex:1,alignItems:'center',justifyContent:'center'},
   auth:{flexGrow:1,justifyContent:'center',padding:24,backgroundColor:C.cream},
-  entryPage:{flexGrow:1,justifyContent:'space-between',paddingHorizontal:28,paddingTop:60,paddingBottom:30,backgroundColor:'#F9F8F3'},
+  entryPage:{flexGrow:1,justifyContent:'space-between',paddingHorizontal:28,paddingTop:60,paddingBottom:30,backgroundColor:'#FFF9F3'},
   entryCenter:{flex:1,justifyContent:'center',alignItems:'center',width:'100%',maxWidth:460,alignSelf:'center'},
-  entryCherry:{height:92,width:92,borderRadius:46,backgroundColor:'#FDE9E8',alignItems:'center',justifyContent:'center',marginBottom:16},
+  entryCherry:{height:92,width:92,borderRadius:46,backgroundColor:'#FBE5E2',alignItems:'center',justifyContent:'center',marginBottom:16},
   entryCherryText:{fontSize:52},
-  entryBrand:{fontSize:43,fontStyle:'italic',fontFamily:'serif',fontWeight:'700',color:'#B82F62',textAlign:'center',letterSpacing:-1},
-  entryBrandPro:{fontSize:32,fontStyle:'italic',fontFamily:'serif',color:'#C49A3A',marginTop:-6,textAlign:'center'},
-  entryRule:{width:65,height:2,backgroundColor:'#C49A3A',marginTop:23,marginBottom:34},
-  entryPrimary:{backgroundColor:'#286D4D',paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center',marginBottom:14},
-  entryPrimaryText:{color:'#FFFFFF',fontSize:17,fontWeight:'800'},
-  entrySecondary:{backgroundColor:'#FFFFFF',borderColor:'#BBD0C0',borderWidth:1.5,paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center'},
-  entrySecondaryText:{color:'#286D4D',fontSize:17,fontWeight:'800'},
+  entryBrand:{fontSize:43,fontStyle:'italic',fontFamily:'serif',fontWeight:'700',color:'#A52A35',textAlign:'center',letterSpacing:-1},
+  entryBrandPro:{fontSize:32,fontStyle:'italic',fontFamily:'serif',color:'#BD8A30',marginTop:-6,textAlign:'center'},
+  entryRule:{width:65,height:2,backgroundColor:'#BD8A30',marginTop:23,marginBottom:34},
+  entryPrimary:{backgroundColor:C.burgundy,paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center',marginBottom:14},
+  entryPrimaryText:{fontStyle:'italic',fontFamily:'serif',color:'#FFFFFF',fontSize:17,fontWeight:'800'},
+  entrySecondary:{backgroundColor:'#FFFFFF',borderColor:'#E8CBA3',borderWidth:1.5,paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center'},
+  entrySecondaryText:{fontStyle:'italic',fontFamily:'serif',color:'#A52A35',fontSize:17,fontWeight:'800'},
   entryBack:{alignSelf:'flex-start',paddingVertical:10,marginBottom:8},
-  entryBackText:{color:'#286D4D',fontWeight:'700',fontSize:14},
-  entryLoginCard:{width:'100%',backgroundColor:'#FFFFFF',borderRadius:22,padding:20,borderWidth:1,borderColor:'#E3EAE2'},
-  entryLoginTitle:{fontSize:21,fontWeight:'800',color:'#244934',marginBottom:5},
-  entryLoginHint:{fontSize:13,color:'#687B70',marginBottom:20,lineHeight:19},
+  entryBackText:{fontStyle:'italic',fontFamily:'serif',color:'#A52A35',fontWeight:'700',fontSize:14},
+  entryLoginCard:{width:'100%',backgroundColor:'#FFFFFF',borderRadius:22,padding:20,borderWidth:1,borderColor:'#E8CBA3'},
+  entryLoginTitle:{fontStyle:'italic',fontFamily:'serif',fontSize:21,fontWeight:'800',color:'#651B2B',marginBottom:5},
+  entryLoginHint:{fontSize:13,color:'#80636A',marginBottom:20,lineHeight:19},
   entryRegister:{alignItems:'center',padding:10},
-  entryRegisterText:{color:'#286D4D',fontWeight:'700',fontSize:13},
-  entryFooter:{textAlign:'center',fontSize:10,letterSpacing:1.3,color:'#8B988D',fontWeight:'700',marginTop:20},
-  authModern:{flexGrow:1,backgroundColor:'#F4F7F3'},
-  authHero:{minHeight:320,backgroundColor:'#153E30',paddingHorizontal:26,paddingTop:62,paddingBottom:30,overflow:'hidden',position:'relative'},
-  authOrbLarge:{position:'absolute',width:300,height:300,borderRadius:150,backgroundColor:'#245B43',right:-130,top:-80},
-  authOrbSmall:{position:'absolute',width:185,height:185,borderRadius:100,backgroundColor:'#2D6A4B',right:-70,bottom:-120},
+  entryRegisterText:{color:'#A52A35',fontWeight:'700',fontSize:13},
+  entryFooter:{textAlign:'center',fontSize:10,letterSpacing:1.3,color:'#80636A',fontWeight:'700',marginTop:20},
+  authModern:{flexGrow:1,backgroundColor:'#FFF9F3'},
+  authHero:{minHeight:320,backgroundColor:C.burgundy,paddingHorizontal:26,paddingTop:62,paddingBottom:30,overflow:'hidden',position:'relative'},
+  authOrbLarge:{position:'absolute',width:300,height:300,borderRadius:150,backgroundColor:'#842537',right:-130,top:-80},
+  authOrbSmall:{position:'absolute',width:185,height:185,borderRadius:100,backgroundColor:'#A52A35',right:-70,bottom:-120},
   authTopline:{flexDirection:'row',alignItems:'center',gap:10},
-  authBrandMark:{width:42,height:42,borderRadius:13,backgroundColor:'#D4EDC7',alignItems:'center',justifyContent:'center'},
-  authBrandMarkText:{color:'#164332',fontWeight:'900',fontSize:16},
-  authEdition:{color:'#DBF0E2',fontSize:11,fontWeight:'800',letterSpacing:2},
+  authBrandMark:{width:42,height:42,borderRadius:13,backgroundColor:'#F6DEAF',alignItems:'center',justifyContent:'center'},
+  authBrandMarkText:{color:'#651B2B',fontWeight:'900',fontSize:16},
+  authEdition:{color:'#FBE9CE',fontSize:11,fontWeight:'800',letterSpacing:2},
   authHeroContent:{marginTop:30},
-  authEyebrow:{color:'#B6DDBB',fontSize:10,fontWeight:'800',letterSpacing:1.6,marginBottom:12},
-  authHeroTitle:{color:'#FFFFFF',fontSize:31,fontWeight:'900',lineHeight:37,letterSpacing:-.7},
-  authHeroDesc:{color:'#D1E6D9',fontSize:13,lineHeight:20,marginTop:12,maxWidth:310},
+  authEyebrow:{color:'#F6DEAF',fontSize:10,fontWeight:'800',letterSpacing:1.6,marginBottom:12},
+  authHeroTitle:{fontStyle:'italic',fontFamily:'serif',color:'#FFFFFF',fontSize:31,fontWeight:'900',lineHeight:37,letterSpacing:-.7},
+  authHeroDesc:{color:'#FBE9CE',fontSize:13,lineHeight:20,marginTop:12,maxWidth:310},
   authHeroTags:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:20},
-  authHeroTag:{color:'#E0F3E6',backgroundColor:'#FFFFFF20',borderColor:'#FFFFFF30',borderWidth:1,overflow:'hidden',borderRadius:20,paddingHorizontal:10,paddingVertical:6,fontSize:11,fontWeight:'600'},
+  authHeroTag:{color:'#FBE9CE',backgroundColor:'#FFFFFF20',borderColor:'#FFFFFF30',borderWidth:1,overflow:'hidden',borderRadius:20,paddingHorizontal:10,paddingVertical:6,fontSize:11,fontWeight:'600'},
   authContent:{paddingHorizontal:23,paddingTop:26,paddingBottom:36},
-  authWelcome:{fontSize:24,fontWeight:'900',color:'#183C2D',letterSpacing:-.5},
-  authLead:{fontSize:13,color:'#607369',marginTop:7,marginBottom:22,lineHeight:20},
-  authForm:{backgroundColor:'#FFFFFF',borderRadius:22,padding:19,borderWidth:1,borderColor:'#E2EBE3',marginBottom:18},
-  authFooter:{textAlign:'center',color:'#809488',fontSize:10,fontWeight:'700',letterSpacing:1.2,marginBottom:14},
-  brand:{fontSize:30,fontWeight:'900',color:C.green,marginBottom:6},
-  heading:{fontSize:23,fontWeight:'800',color:C.ink,marginBottom:8},
+  authWelcome:{fontStyle:'italic',fontFamily:'serif',fontSize:24,fontWeight:'900',color:'#651B2B',letterSpacing:-.5},
+  authLead:{fontSize:13,color:'#80636A',marginTop:7,marginBottom:22,lineHeight:20},
+  authForm:{backgroundColor:'#FFFFFF',borderRadius:22,padding:19,borderWidth:1,borderColor:'#E8CBA3',marginBottom:18},
+  authFooter:{textAlign:'center',color:'#80636A',fontSize:10,fontWeight:'700',letterSpacing:1.2,marginBottom:14},
+  brand:{fontStyle:'italic',fontFamily:'serif',fontSize:30,fontWeight:'900',color:C.green,marginBottom:6},
+  heading:{fontStyle:'italic',fontFamily:'serif',fontSize:23,fontWeight:'800',color:C.ink,marginBottom:8},
   subtitle:{fontSize:14,color:C.muted,marginBottom:20},
-  section:{fontSize:18,fontWeight:'800',color:C.ink,marginVertical:14},
-  label:{fontSize:14,fontWeight:'700',color:C.ink,marginBottom:7},
-  card:{backgroundColor:C.white,borderRadius:16,padding:16,marginBottom:14,borderWidth:1,borderColor:C.line},
-  button:{backgroundColor:C.green,borderRadius:12,padding:15,alignItems:'center',marginBottom:12},
-  buttonText:{fontSize:15,fontWeight:'800',color:C.white},
-  big:{fontSize:30,fontWeight:'900',color:C.green,marginVertical:6},
+  section:{fontStyle:'italic',fontFamily:'serif',fontSize:18,fontWeight:'800',color:C.ink,marginVertical:14},
+  label:{fontStyle:'italic',fontFamily:'serif',fontSize:14,fontWeight:'700',color:C.ink,marginBottom:7},
+  card:{backgroundColor:C.white,borderLeftWidth:4,borderLeftColor:C.gold,borderRadius:16,padding:16,marginBottom:14,borderWidth:1,borderColor:C.line},
+  button:{backgroundColor:C.green,borderWidth:1,borderColor:C.gold,borderRadius:12,padding:15,alignItems:'center',marginBottom:12},
+  buttonText:{fontStyle:'italic',fontFamily:'serif',fontSize:15,fontWeight:'800',color:C.white},
+  big:{fontStyle:'italic',fontFamily:'serif',fontSize:30,fontWeight:'900',color:C.green,marginVertical:6},
   choices:{flexDirection:'row',flexWrap:'wrap',gap:7},
   chip:{paddingHorizontal:11,paddingVertical:10,borderWidth:1,borderColor:C.line,borderRadius:10,backgroundColor:C.white},
-  selected:{backgroundColor:C.green,borderColor:C.green},
-  notice:{padding:12,backgroundColor:'#F0F6F0',borderRadius:10,marginBottom:16,color:C.ink},
+  selected:{backgroundColor:C.burgundy,borderColor:C.gold},
+  notice:{padding:12,backgroundColor:'#FFF0DC',borderRadius:10,marginBottom:16,color:C.ink},
   logout:{color:C.danger,textAlign:'center',fontWeight:'700',padding:16},
-  back:{color:C.green,fontWeight:'700',marginBottom:20},
+  back:{fontStyle:'italic',fontFamily:'serif',color:C.green,fontWeight:'700',marginBottom:20},
 });
