@@ -154,7 +154,7 @@ function AuthView({userId,onDone,onLogout}:{userId:string|null;onDone:()=>Promis
       <View style={styles.authTopline}><View style={styles.authBrandMark}><Text style={styles.authBrandMarkText}>CB</Text></View><Text style={styles.authEdition}>CALIDAD BERRIES  /  PRO</Text></View>
       <View style={styles.authHeroContent}>
         <Text style={styles.authEyebrow}>PLATAFORMA DE CONTROL DE CALIDAD</Text>
-        <Text style={styles.authHeroTitle}>Cada muestra.{"\\n"}Una mejor cosecha.</Text>
+        <Text style={styles.authHeroTitle}>Cada muestra.{"\n"}Una mejor cosecha.</Text>
         <Text style={styles.authHeroDesc}>Supervisa, registra y consulta tus procesos con precisión, desde cualquier lugar.</Text>
         <View style={styles.authHeroTags}><Text style={styles.authHeroTag}>●  Muestreos</Text><Text style={styles.authHeroTag}>●  Trazabilidad</Text><Text style={styles.authHeroTag}>●  Equipo</Text></View>
       </View>
