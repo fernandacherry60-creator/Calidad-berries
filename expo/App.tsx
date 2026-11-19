@@ -147,18 +147,32 @@ function AuthView({userId,onDone,onLogout}:{userId:string|null;onDone:()=>Promis
       }
     }catch(e){Alert.alert('No se pudo continuar',errorMessage(e));}finally{setWorking(false);}
   }
-  return <ScrollView contentContainerStyle={styles.auth}>
-    <Text style={styles.brand}>Calidad Berries Pro</Text>
-    <Text style={styles.subtitle}>Nueva aplicación · Control de calidad de fruta</Text>
-    {userId&&<Text style={styles.notice}>La sesión existe pero no hay perfil activo. Confirma tu correo o canjea la invitación. Puedes cerrar sesión y volver a entrar.</Text>}
-    <View style={styles.card}>
-      <Choice label="Acceso" options={['Iniciar sesión','Activar Fernanda','Registrar trabajador']} value={mode==='login'?'Iniciar sesión':mode==='owner'?'Activar Fernanda':'Registrar trabajador'}
-        onChange={v=>setMode(v==='Iniciar sesión'?'login':v==='Activar Fernanda'?'owner':'worker')}/>
-      {mode==='worker'&&<><Input label="Código de invitación (12 caracteres)" value={code} onChange={setCode}/><Input label="Nombre completo" value={name} onChange={setName}/><Choice label="Puesto" options={puestos} value={puesto} onChange={setPuesto}/></>}
-      <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
-      <Input label="Contraseña (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
-      <Button title={working?'Procesando…':mode==='login'?'Iniciar sesión':mode==='owner'?'Solicitar activación':'Crear cuenta'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
-      {userId&&<Button title="Cerrar sesión" onPress={onLogout}/>}
+  return <ScrollView contentContainerStyle={styles.authModern} keyboardShouldPersistTaps="handled">
+    <View style={styles.authHero}>
+      <View style={styles.authOrbLarge}/>
+      <View style={styles.authOrbSmall}/>
+      <View style={styles.authTopline}><View style={styles.authBrandMark}><Text style={styles.authBrandMarkText}>CB</Text></View><Text style={styles.authEdition}>CALIDAD BERRIES  /  PRO</Text></View>
+      <View style={styles.authHeroContent}>
+        <Text style={styles.authEyebrow}>PLATAFORMA DE CONTROL DE CALIDAD</Text>
+        <Text style={styles.authHeroTitle}>Cada muestra.{"\\n"}Una mejor cosecha.</Text>
+        <Text style={styles.authHeroDesc}>Supervisa, registra y consulta tus procesos con precisión, desde cualquier lugar.</Text>
+        <View style={styles.authHeroTags}><Text style={styles.authHeroTag}>●  Muestreos</Text><Text style={styles.authHeroTag}>●  Trazabilidad</Text><Text style={styles.authHeroTag}>●  Equipo</Text></View>
+      </View>
+    </View>
+    <View style={styles.authContent}>
+      <Text style={styles.authWelcome}>{mode==='login'?'Bienvenida de nuevo':mode==='owner'?'Activar acceso administrativo':'Únete al equipo'}</Text>
+      <Text style={styles.authLead}>{mode==='login'?'Ingresa tus credenciales para continuar.':mode==='owner'?'Registra tu correo autorizado y confirma el enlace que recibirás.':'Completa tus datos y utiliza el código de invitación proporcionado por tu administradora.'}</Text>
+      {userId&&<Text style={styles.notice}>Hay una sesión sin perfil activo. Confirma tu correo o canjea tu invitación. También puedes cerrar sesión.</Text>}
+      <View style={styles.authForm}>
+        <Choice label="Tipo de acceso" options={['Iniciar sesión','Administradora','Trabajador']} value={mode==='login'?'Iniciar sesión':mode==='owner'?'Administradora':'Trabajador'}
+          onChange={v=>setMode(v==='Iniciar sesión'?'login':v==='Administradora'?'owner':'worker')}/>
+        {mode==='worker'&&<><Input label="Código de invitación (12 caracteres)" value={code} onChange={setCode}/><Input label="Nombre completo" value={name} onChange={setName}/><Choice label="Puesto" options={puestos} value={puesto} onChange={setPuesto}/></>}
+        <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
+        <Input label="Contraseña (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
+        <Button title={working?'Procesando…':mode==='login'?'Entrar a mi espacio':mode==='owner'?'Activar mi cuenta':'Crear cuenta'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
+        {userId&&<Button title="Cerrar sesión" onPress={onLogout}/>}
+      </View>
+      <Text style={styles.authFooter}>CALIDAD BERRIES PRO  ·  CONTROL Y TRAZABILIDAD</Text>
     </View>
   </ScrollView>;
 }
@@ -278,6 +292,25 @@ const styles=StyleSheet.create({
   topTitle:{fontSize:23,fontWeight:'800',color:C.white},topSmall:{color:'#D9F2E4',marginTop:5},
   center:{flex:1,alignItems:'center',justifyContent:'center'},
   auth:{flexGrow:1,justifyContent:'center',padding:24,backgroundColor:C.cream},
+  authModern:{flexGrow:1,backgroundColor:'#F4F7F3'},
+  authHero:{minHeight:320,backgroundColor:'#153E30',paddingHorizontal:26,paddingTop:62,paddingBottom:30,overflow:'hidden',position:'relative'},
+  authOrbLarge:{position:'absolute',width:300,height:300,borderRadius:150,backgroundColor:'#245B43',right:-130,top:-80},
+  authOrbSmall:{position:'absolute',width:185,height:185,borderRadius:100,backgroundColor:'#2D6A4B',right:-70,bottom:-120},
+  authTopline:{flexDirection:'row',alignItems:'center',gap:10},
+  authBrandMark:{width:42,height:42,borderRadius:13,backgroundColor:'#D4EDC7',alignItems:'center',justifyContent:'center'},
+  authBrandMarkText:{color:'#164332',fontWeight:'900',fontSize:16},
+  authEdition:{color:'#DBF0E2',fontSize:11,fontWeight:'800',letterSpacing:2},
+  authHeroContent:{marginTop:30},
+  authEyebrow:{color:'#B6DDBB',fontSize:10,fontWeight:'800',letterSpacing:1.6,marginBottom:12},
+  authHeroTitle:{color:'#FFFFFF',fontSize:31,fontWeight:'900',lineHeight:37,letterSpacing:-.7},
+  authHeroDesc:{color:'#D1E6D9',fontSize:13,lineHeight:20,marginTop:12,maxWidth:310},
+  authHeroTags:{flexDirection:'row',flexWrap:'wrap',gap:7,marginTop:20},
+  authHeroTag:{color:'#E0F3E6',backgroundColor:'#FFFFFF20',borderColor:'#FFFFFF30',borderWidth:1,overflow:'hidden',borderRadius:20,paddingHorizontal:10,paddingVertical:6,fontSize:11,fontWeight:'600'},
+  authContent:{paddingHorizontal:23,paddingTop:26,paddingBottom:36},
+  authWelcome:{fontSize:24,fontWeight:'900',color:'#183C2D',letterSpacing:-.5},
+  authLead:{fontSize:13,color:'#607369',marginTop:7,marginBottom:22,lineHeight:20},
+  authForm:{backgroundColor:'#FFFFFF',borderRadius:22,padding:19,borderWidth:1,borderColor:'#E2EBE3',marginBottom:18},
+  authFooter:{textAlign:'center',color:'#809488',fontSize:10,fontWeight:'700',letterSpacing:1.2,marginBottom:14},
   brand:{fontSize:30,fontWeight:'900',color:C.green,marginBottom:6},
   heading:{fontSize:23,fontWeight:'800',color:C.ink,marginBottom:8},
   subtitle:{fontSize:14,color:C.muted,marginBottom:20},
