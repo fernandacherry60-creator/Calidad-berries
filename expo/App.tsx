@@ -16,7 +16,18 @@ const Input = ({label,value,onChange,secure=false,keyboard='default'}: {label:st
   <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><TextInput autoCapitalize={keyboard==='email-address'?'none':'sentences'} secureTextEntry={secure} keyboardType={keyboard} style={fieldStyle} value={value} onChangeText={onChange}/></View>;
 const Choice = ({label,options,value,onChange}: {label:string;options:string[];value:string;onChange:(v:string)=>void}) =>
   <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><View style={styles.choices}>{options.map(v=><Pressable key={v} onPress={()=>onChange(v)} style={[styles.chip,value===v&&styles.selected]}><Text style={{color:value===v?C.white:C.ink}}>{v}</Text></Pressable>)}</View></View>;
-const errorMessage = (e:unknown) => e instanceof Error?e.message:String(e);
+const errorMessage = (e:unknown):string => {
+  if(e instanceof Error)return e.message;
+  if(typeof e==='string')return e;
+  if(e&&typeof e==='object'){
+    const value=e as Record<string,unknown>;
+    for(const key of ['message','error_description','details','hint','code']){
+      if(typeof value[key]==='string'&&value[key])return String(value[key]);
+    }
+    try{return JSON.stringify(e);}catch{return 'Error desconocido';}
+  }
+  return String(e);
+};
 const n = (v:string) => Number(v.replace(',','.'))||0;
 const nonNegative = (v:number) => Number.isFinite(v)&&v>=0;
 const identity = (profile:Profile) => ({usuario_email:profile.email,usuario_nombre:profile.display_name,usuario_puesto:profile.puesto});
@@ -43,7 +54,13 @@ export default function App() {
     const {data:{session}}=await supabase.auth.getSession();
     const user=session?.user;
     if(!user){setUserId(null);setProfile(null);return;}
-    setUserId(user.id);
+    // Comprobar que la sesión guardada sigue perteneciendo a un usuario real.
+    const {data:validated,error:authError}=await supabase.auth.getUser();
+    if(authError||!validated.user||validated.user.id!==user.id){
+      await supabase.auth.signOut({scope:'local'});
+      setUserId(null);setProfile(null);return;
+    }
+    setUserId(validated.user.id);
     let p:Profile|null=null;
     try {
       p=await loadProfile(user.id);
@@ -86,7 +103,11 @@ export default function App() {
     const app=AppState.addEventListener('change',state=>{if(state==='active')void sync();});
     return ()=>{active=false;net();app.remove();};
   },[profile]);
-  async function logout(){await supabase.auth.signOut();await clearCachedProfile();setProfile(null);setUserId(null);setScreen('home');}
+  async function logout(){
+    try{await supabase.auth.signOut({scope:'local'});}
+    catch(e){Alert.alert('Cerrar sesión',errorMessage(e));}
+    finally{await clearCachedProfile();setProfile(null);setUserId(null);setScreen('home');}
+  }
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
@@ -172,13 +193,13 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
         <View style={styles.entryLoginCard}>
           <Text style={styles.entryLoginTitle}>{selected==='admin'?'Panel de administrador':'Panel de trabajador'}</Text>
           <Text style={styles.entryLoginHint}>{'Ingresa tu correo y contraseña para continuar.'}</Text>
-          {userId&&<Text style={styles.notice}>Hay una sesión sin perfil activo. Confirma tu correo o cierra sesión.</Text>}
+          {userId&&<Text style={styles.notice}>Hay una sesión guardada sin perfil validado. Pulsa Cerrar sesión y vuelve a ingresar.</Text>}
 
           <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
           <Input label="Contraseña (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
           <Button title={working?'Procesando…':'Ingresar'} disabled={working||password.length<8||!email.includes('@')} onPress={submit}/>
           <Pressable onPress={async()=>{const normalized=email.trim().toLowerCase();if(!normalized.includes('@')){Alert.alert('Recuperar acceso','Escribe primero tu correo electrónico.');return;}setWorking(true);try{const {error}=await supabase.auth.resetPasswordForEmail(normalized,{redirectTo:'calidadberriespro://auth-callback'});if(error)throw error;Alert.alert('Revisa tu correo','Abre el enlace de recuperación en este teléfono y escribe tu nueva contraseña en la aplicación.');}catch(e){Alert.alert('Recuperación',errorMessage(e));}finally{setWorking(false);}}} style={styles.entryRegister}><Text style={styles.entryRegisterText}>Olvidé mi contraseña</Text></Pressable>
-          {userId&&<Button title="Cerrar sesión" onPress={onLogout}/>}
+          <Button title="Reiniciar sesión en este teléfono" onPress={onLogout}/>
         </View>
       </>}
     </View>
