@@ -177,7 +177,7 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
   }
   return <ScrollView contentContainerStyle={styles.entryPage} keyboardShouldPersistTaps="handled">
     <View style={styles.entryCenter}>
-      <View style={styles.entryCherry}><Text style={styles.entryCherryText}>🍒</Text></View>
+      <View style={styles.entryCherry}><Text style={styles.entryCherryText}>🍓</Text></View>
       <Text style={styles.entryBrand}>Calidad Berries</Text>
       <Text style={styles.entryBrandPro}>Pro</Text>
       <View style={styles.entryRule}/>
