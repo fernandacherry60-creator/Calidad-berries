@@ -2,7 +2,7 @@ import type { ExpoConfig, ConfigContext } from 'expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'QUALYX Control de Calidad Berries',
+  name: 'QUALYX',
   icon: './assets/QUALYX-logo-v2.png',
   slug: 'klunder-tropi',
   owner: 'tropicas-team',
