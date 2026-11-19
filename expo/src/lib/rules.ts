@@ -15,7 +15,7 @@ export const andenDefects: Defect[] = [
   ['Podrido','Podrido','condicion'],['Humedo Sangrante','Húmedo Sangrante','condicion'],
   ['Colapsada / Blanda','Colapsada / Blanda','condicion'],['Fumagina','Fumagina','condicion'],
   ['Roya','Roya','condicion'],['Sobre Maduro','Sobre Maduro','condicion'],
-  ['Cenicilla','Cenicilla','condicion'],['Verde','Verde','apariencia',15],
+  ['Cenicilla','Cenicilla','condicion'],['Excreta de pajaro','Excreta de pájaro','condicion'],['Verde','Verde','apariencia',15],
   ['Quebrada','Quebrada','apariencia',15],['Picada de pajaro','Picada de pájaro','apariencia'],
   ['Suciedad','Suciedad','apariencia'],['Quemadura de sol','Quemadura de sol','apariencia'],
   ['Dano de viento','Daño de viento','apariencia'],['Residuo de aplicacion','Residuo de aplicación','apariencia'],
@@ -27,16 +27,16 @@ export const procesoDefects: Defect[] = [
   ['Pudricion / Hongo','Podrición / hongo','Cosecha'],['Sangrante','Exudación / Sangrante','Cosecha'],
   ['Colapsada','Colapsada / blanda','Cosecha'],['Sobre maduro','Sobre maduro','Cosecha'],
   ['Verde','Verde','Cosecha'],['Quebrada','Quebrada','Cosecha'],
-  ['Insectos / larva','Insecto / larva','Cosecha'],['Fumagina','Fumagina','Agronomia'],
-  ['Roya','Roya','Agronomia'],['Cenicilla','Cenicilla','Agronomia'],
+  ['Insectos / larva','Insecto / larva','Cosecha'],['Fruta buena','Fruta buena','Cosecha'],['Fumagina','Fumagina','Agronomia'],
+  ['Roya','Roya','Agronomia'],['Botrytis','Botrytis','Agronomia'],['Cenicilla','Cenicilla','Agronomia'],
   ['Avejigada','Avejigada','Agronomia'],['Mal formada','Malformada','Agronomia'],
   ['Extra chico','Extra chica','Agronomia'],['Bicolor','Bicolor','Agronomia'],
   ['Residuo de aplicacion','Residuo de aplicación','Agronomia'],
   ['Dano por chinche','Daño de chinche','Agronomia'],['Dano de trips','Daño de trips','Agronomia'],
   ['Pelicula blanca','Película blanca','Agronomia'],['Desgranada','Desgranada','Agronomia'],
   ['Picado de ave','Picada de pájaro','Actividades'],['Quemadura de sol','Quemadura de sol','Actividades'],
-  ['Dano por viento','Daño de viento','Actividades'],['Dano mecanico','Daño mecánico','Actividades'],
-  ['Suciedad','Suciedad','Inocuidad'],['Materia extrana','Materia extraña','Inocuidad'],
+  ['Dano por viento','Daño de viento','Actividades'],['Dano mecanico','Daño mecánico','Actividades'],['Deshidratada','Deshidratada','Actividades'],
+  ['Suciedad','Suciedad','Inocuidad'],['Excreta de pajaro','Excreta de pájaro','Inocuidad'],['Materia extrana','Materia extraña','Inocuidad'],
 ].map(([key,label,category])=>({key:String(key),label:String(label),category:String(category)}));
 export const canastosPorCajas = (cajas: number) => cajas<=0?0:Math.ceil(cajas/24);
 export function scoreAnden(counts: Record<string,number>, total: number, larvas=0) {
@@ -53,27 +53,27 @@ export function scoreAnden(counts: Record<string,number>, total: number, larvas=
   const puntosCondicion=condicion<=0.05+1e-9?50:0;
   const puntosTotal=puntosCondicion+puntosApariencia;
   const decimas=Math.round(apariencia*1000);
-  const disposicion=condicion>0.05+1e-9||decimas>=156||larvas>=2||puntosTotal<60
+  const disposicion=(counts['Excreta de pajaro']||0)>=1||condicion>0.05+1e-9||decimas>=156||larvas>=2||puntosTotal<60
     ?'RECHAZO':decimas>=150||larvas===1?'REEMPAQUE':'PASO';
   return { pct_condicion:condicion,pct_apariencia:apariencia,
     puntos_condicion:puntosCondicion,puntos_apariencia:puntosApariencia,
     puntos_total:puntosTotal,disposicion };
 }
-export function scoreProceso(counts: Record<string,number>, total: number, cajas: number, taras: number) {
+export function scoreProceso(counts: Record<string,number>, total: number, cajas: number, taras: number, empacableManual?: number) {
   if(total<=0) throw new Error('La muestra debe contener frutos');
   const percentages:Record<string,number>={};
   const areas:Record<string,number>={Agronomia:0,Poscosecha:0,Cosecha:0,Actividades:0,Inocuidad:0};
   let totalDefectos=0;
   for(const d of procesoDefects) {
     const pct=(counts[d.key]||0)/total*100;
-    percentages[d.key]=pct;areas[d.category]+=pct;totalDefectos+=pct;
+    percentages[d.key]=pct;if(d.key!=='Fruta buena'){areas[d.category]+=pct;totalDefectos+=pct;}
   }
   const potencial=['Verde','Quebrada','Mal formada','Extra chico']
     .reduce((sum,key)=>sum+(percentages[key]||0),0);
-  const kg=cajas*2.23+taras*2.6;
+  const kg=cajas*2.23+taras*3;
   return { defectos_json:percentages,area_agronomia:areas.Agronomia,
     area_poscosecha:areas.Poscosecha,area_cosecha:areas.Cosecha,
     area_actividades:areas.Actividades,area_inocuidad:areas.Inocuidad,
-    total_defectos:Math.min(100,totalDefectos),potencial_empacable:Math.min(100,potencial),
-    pct_proceso:kg>0?taras*2.6/kg*100:null };
+    total_defectos:Math.min(100,totalDefectos),potencial_empacable:empacableManual===undefined?Math.min(100,potencial):empacableManual,
+    pct_proceso:kg>0?taras*3/kg*100:null };
 }
