@@ -23,7 +23,7 @@ const identity = (profile:Profile) => ({usuario_email:profile.email,usuario_nomb
 async function handleAuthLink(url:string):Promise<boolean> {
   const params=new URLSearchParams([url.split('?')[1]?.split('#')[0]||'',url.split('#')[1]||''].filter(Boolean).join('&'));
   const error=params.get('error_description');if(error)throw new Error(error);
-  const recovery=params.get('type')==='recovery';
+  const recovery=['recovery','invite'].includes(params.get('type')||'');
   const access=params.get('access_token'),refresh=params.get('refresh_token'),code=params.get('code');
   if(access&&refresh){const {error}=await supabase.auth.setSession({access_token:access,refresh_token:refresh});if(error)throw error;}
   else if(code){const {error}=await supabase.auth.exchangeCodeForSession(code);if(error)throw error;}
@@ -117,20 +117,15 @@ export default function App() {
 }
 function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()=>Promise<void>;onLogout:()=>Promise<void>;onPanel:(v:'admin'|'worker')=>void}) {
   const [selected,setSelected]=useState<'admin'|'worker'|null>(null);
-  const [register,setRegister]=useState(false);
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
-  const [name,setName]=useState('');
-  const [puesto,setPuesto]=useState(puestos[0]);
-  const [code,setCode]=useState('');
   const [working,setWorking]=useState(false);
-  const allowedAdminEmail=(value:string)=>['fernanda.var.pre@gmail.com','yamilethklunder@gmail.com'].includes(value);
   async function submit(){
     if(!selected)return;
     setWorking(true);
     try{
       const normalized=email.trim().toLowerCase();
-      if(!register){
+      {
         const {data,error}=await supabase.auth.signInWithPassword({email:normalized,password});
         if(error)throw error;
         const signedUser=data.user;
@@ -166,17 +161,17 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
       <Text style={styles.entryBrandPro}>Pro</Text>
       <View style={styles.entryRule}/>
       {selected===null?<>
-        <Pressable style={styles.entryPrimary} onPress={()=>{setSelected('admin');setRegister(false);}}>
+        <Pressable style={styles.entryPrimary} onPress={()=>{setSelected('admin');}}>
           <Text style={styles.entryPrimaryText}>Panel de administrador</Text>
         </Pressable>
-        <Pressable style={styles.entrySecondary} onPress={()=>{setSelected('worker');setRegister(false);}}>
+        <Pressable style={styles.entrySecondary} onPress={()=>{setSelected('worker');}}>
           <Text style={styles.entrySecondaryText}>Panel de trabajador</Text>
         </Pressable>
       </>:<>
-        <Pressable onPress={()=>{setSelected(null);setRegister(false);setPassword('');}} style={styles.entryBack}><Text style={styles.entryBackText}>‹ Elegir otro panel</Text></Pressable>
+        <Pressable onPress={()=>{setSelected(null);setPassword('');}} style={styles.entryBack}><Text style={styles.entryBackText}>‹ Elegir otro panel</Text></Pressable>
         <View style={styles.entryLoginCard}>
           <Text style={styles.entryLoginTitle}>{selected==='admin'?'Panel de administrador':'Panel de trabajador'}</Text>
-          <Text style={styles.entryLoginHint}>{register?'Completa los datos para activar tu acceso.':'Ingresa tu correo y contraseña para continuar.'}</Text>
+          <Text style={styles.entryLoginHint}>{'Ingresa tu correo y contraseña para continuar.'}</Text>
           {userId&&<Text style={styles.notice}>Hay una sesión sin perfil activo. Confirma tu correo o cierra sesión.</Text>}
 
           <Input label="Correo electrónico" value={email} onChange={setEmail} keyboard="email-address"/>
