@@ -361,7 +361,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
     setCajas(String(p.cajas_recibidas??p.cajas??0));setTaras(String(p.taras??0));
     setFrutos(String(p.fruta_muestra??p.frutos_muestra??100));setLarvas(String(p.frutos_larva??0));
     setPeso(String(p.peso??''));setBrix(String(p.grados_brix??''));setEmbaladora(String(p.muestreados??''));
-    setNota(String(p.motivo??''));setCounts(Object.fromEntries(Object.entries((p.defectos_json||{}) as Record<string,number>).map(([k,v])=>[k,String(v)])));
+    setNota(String(p.motivo??''));setCounts(Object.fromEntries(Object.entries((p.defectos_json||{}) as Record<string,number>).map(([k,v])=>[k,String(editing.table_name==='muestreos_proceso'?Math.round(Number(v)*Number(p.frutos_muestra||100)/100):v)])));
     setEmpacable(p.potencial_empacable==null?'':String(p.potencial_empacable));
   },[editing]);
   async function save(){
