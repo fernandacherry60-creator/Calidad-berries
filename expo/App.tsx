@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
@@ -109,7 +109,7 @@ export default function App() {
     catch(e){Alert.alert('Cerrar sesión',errorMessage(e));}
     finally{await clearCachedProfile();setProfile(null);setUserId(null);setScreen('cultivos');}
   }
-  if(busy)return <View style={styles.center}><Text style={{fontSize:36,fontWeight:"800",color:C.green,textAlign:"center"}}>QUALYX</Text><Text style={{fontSize:15,color:C.muted,marginVertical:16}}>Control de Calidad Berries</Text><ActivityIndicator color={C.green} size="large"/></View>;
+  if(busy)return <View style={styles.center}><Image source={require("./assets/QUALYX-logo-v2.png")} style={{width:270,height:270}} resizeMode="contain" accessibilityLabel="QUALYX Control de Calidad Berries"/><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
   const navigate=(next:Screen)=>{if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);setScreen(next);};
@@ -188,7 +188,7 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
   }
   return <ScrollView contentContainerStyle={styles.entryPage} keyboardShouldPersistTaps="handled">
     <View style={styles.entryCenter}>
-      <View style={styles.entryCherry}><Text style={styles.entryCherryText}>🍓</Text></View>
+      <Image source={require("./assets/frutas-sin-fondo.png")} style={styles.entryFruitLogo} resizeMode="contain" accessibilityLabel="Frutas QUALYX"/>
       <Text style={styles.entryBrand}>QUALYX</Text>
       <Text style={styles.entryBrandPro}>Control de Calidad Berries</Text>
       <View style={styles.entryRule}/>
@@ -471,7 +471,7 @@ const styles=StyleSheet.create({
   auth:{flexGrow:1,justifyContent:'center',padding:24,backgroundColor:C.cream},
   entryPage:{flexGrow:1,justifyContent:'space-between',paddingHorizontal:28,paddingTop:60,paddingBottom:30,backgroundColor:'#FFF9F3'},
   entryCenter:{flex:1,justifyContent:'center',alignItems:'center',width:'100%',maxWidth:460,alignSelf:'center'},
-  entryCherry:{height:92,width:92,borderRadius:46,backgroundColor:'#FBE5E2',alignItems:'center',justifyContent:'center',marginBottom:16},
+  entryFruitLogo:{height:220,width:280,marginBottom:16,alignSelf:'center'},
   entryCherryText:{fontSize:52},
   entryBrand:{fontSize:43,fontStyle:'italic',fontFamily:'serif',fontWeight:'700',color:'#A52A35',textAlign:'center',letterSpacing:-1},
   entryBrandPro:{fontSize:17,fontStyle:'italic',fontFamily:'serif',color:'#BD8A30',marginTop:-6,textAlign:'center'},
