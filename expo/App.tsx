@@ -112,7 +112,8 @@ export default function App() {
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
-  const navigate=(next:Screen)=>setScreen(next);
+  const navigate=(next:Screen)=>{if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);setScreen(next);};
+  const openEdit=(row:LocalSample)=>{setEditing(row);setScreen(row.table_name==='muestreos_anden'?'anden':'proceso');};
   const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
   return <View style={styles.page}>
@@ -136,12 +137,12 @@ export default function App() {
         {adminPanel&&<Button title="Trabajadores y muestreos en la nube" onPress={()=>navigate('team')}/>}
         <Pressable onPress={logout}><Text style={styles.logout}>Cerrar sesión</Text></Pressable>
       </>}
-      {screen==='team'&&adminPanel&&<TeamView/>}
+      {screen==='team'&&adminPanel&&<TeamView onEdit={openEdit}/>}
       {screen==='calculadora'&&<CalculatorView/>}
       {screen==='pesos'&&<WeightsView/>}
       {screen==='ayuda'&&<HelpView/>}
       {screen==='informes'&&<ReportsView/>}
-      {screen==='history'&&<HistoryView profile={profile} onEdit={row=>{setEditing(row);navigate(row.table_name==='muestreos_anden'?'anden':'proceso');}}/>}
+      {screen==='history'&&<HistoryView profile={profile} onEdit={openEdit}/>}
       {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
   </View>;
@@ -231,7 +232,7 @@ function ResetPasswordView({onComplete}:{onComplete:()=>Promise<void>}){
       }}/>
     </View></View></ScrollView>;
 }
-function TeamView(){
+function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
   const [members,setMembers]=useState<Profile[]>([]);
   const [samples,setSamples]=useState<Record<string,unknown>[]>([]);
   const [invitation,setInvitation]=useState('');
@@ -245,7 +246,7 @@ function TeamView(){
       if(error)throw error;setMembers((data||[]) as Profile[]);
       const all:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso','semaforo'] as TableName[]){
-        const result=await supabase.from(table).select('uuid,fecha,usuario_nombre,usuario_email,cultivo').order('fecha',{ascending:false}).limit(50);
+        const result=await supabase.from(table).select('*').order('fecha',{ascending:false}).limit(50);
         if(result.error)throw result.error;
         all.push(...(result.data||[]).map(item=>({...item,tipo:table})));
       }
@@ -272,7 +273,7 @@ function TeamView(){
     <Text style={styles.section}>Personal ({members.length})</Text>
     {members.map(m=><View key={m.user_id} style={styles.card}><Text style={styles.label}>{m.display_name} · {m.role}</Text><Text>{m.email} · {m.puesto} · {m.active?'Activo':'Inactivo'}</Text></View>)}
     <Text style={styles.section}>Últimos muestreos en la nube</Text>
-    {samples.map(m=><View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{String(m.tipo)} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text></View>)}
+    {samples.map(m=><View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{String(m.tipo)} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text>{m.tipo!=='semaforo'&&<Button title="Modificar este muestreo" onPress={()=>onEdit({uuid:String(m.uuid),owner_id:String(m.owner_id),table_name:m.tipo as TableName,payload:JSON.stringify(m),fecha:String(m.fecha),synced:1})}/>}</View>)}
   </>;
 }
 function CalculatorView(){
@@ -406,7 +407,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         const updated={...original,...changes};
         if(editing.synced){
           const {uuid:_uuid,fecha:_fecha,owner_id:_owner,...fields}=changes;
-          await updateSyncedSample(table,editing.uuid,profile.user_id,fields);
+          await updateSyncedSample(table,editing.uuid,editing.owner_id,fields,profile);
         }else await updatePendingSample(editing.uuid,profile.user_id,updated);
         Alert.alert('Actualizado','El muestreo se modificó correctamente.');
       }else{
