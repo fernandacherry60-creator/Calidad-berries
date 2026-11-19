@@ -382,6 +382,11 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
   const [counts,setCounts]=useState<Record<string,string>>({});
   const [saving,setSaving]=useState(false);
   const defects=kind==='anden'?andenDefects:procesoDefects;
+  const totalPreview=n(frutos);
+  const previewCounts=Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')]));
+  const validPreview=totalPreview>0&&Object.values(previewCounts).reduce((s,v)=>s+v,0)<=totalPreview;
+  const andenPreview=kind==='anden'&&validPreview?scoreAnden(previewCounts,totalPreview,n(larvas)):null;
+  const procesoPreview=kind==='proceso'&&validPreview?scoreProceso(previewCounts,totalPreview,n(cajas),n(taras),empacable.trim()?n(empacable):undefined):null;
   useEffect(()=>{
     if(!editing)return;
     const p=JSON.parse(editing.payload) as Record<string,unknown>;
@@ -465,6 +470,16 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
           <Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable>
         </View>)}
       {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
+       <View style={styles.card}>
+         <Text style={styles.section}>Resumen del muestreo</Text>
+         <Text style={styles.label}>Rancho: {rancho} · Frutos: {frutos} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
+         {!validPreview&&<Text style={{color:C.danger}}>Revisa el total de frutos y defectos antes de guardar.</Text>}
+         {andenPreview&&<><Text style={styles.label}>Condición: {(andenPreview.pct_condicion*100).toFixed(1)}% · Apariencia: {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text><Text style={styles.label}>Resultado: {andenPreview.disposicion} · {andenPreview.puntos_total} puntos</Text></>}
+         {procesoPreview&&<><Text style={styles.label}>Porcentaje de proceso: {procesoPreview.pct_proceso?.toFixed(1)??'—'}%</Text><Text style={styles.label}>Empacable (manual): {empacable||'Pendiente'}%</Text><Text style={styles.section}>Áreas de enfoque</Text>
+           <Text>Agronomía: {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha: {procesoPreview.area_cosecha.toFixed(1)}%</Text>
+           <Text>Actividades: {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad: {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
+         {defects.filter(d=>n(counts[d.key]||'0')>0).map(d=><Text key={d.key} style={styles.label}>{d.label}: {counts[d.key]} fruto(s) · {totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>)}
+       </View>
     </>}
     {kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
     <Button title={saving?'Guardando…':editing?'Revisar modificaciones':'Revisar y confirmar muestreo'} disabled={saving} onPress={()=>{
