@@ -7,7 +7,7 @@ import { supabase, loadProfile, redeemPendingInvitation, type Profile } from './
 import { savePending, saveSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
-type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo';
+type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo'|'cultivos'|'calculadora'|'pesos'|'ayuda'|'informes';
 const C = { ink:'#24332D', green:'#28764C', cream:'#F8F7F2', muted:'#65766D', line:'#E3E8E2', white:'#FFFFFF', danger:'#B83C46' };
 const fieldStyle = { borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,backgroundColor:C.white,fontSize:15,color:C.ink } as const;
 const Button = ({title,onPress,disabled=false}: {title:string;onPress:()=>void;disabled?:boolean}) =>
@@ -46,7 +46,7 @@ export default function App() {
   const [userId,setUserId]=useState<string|null>(null);
   const [busy,setBusy]=useState(true);
   const [recovering,setRecovering]=useState(false);
-  const [screen,setScreen]=useState<Screen>('home');
+  const [screen,setScreen]=useState<Screen>('cultivos');
   const [panel,setPanel]=useState<'admin'|'worker'>('admin');
   const [pending,setPending]=useState(0);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
@@ -106,7 +106,7 @@ export default function App() {
   async function logout(){
     try{await supabase.auth.signOut({scope:'local'});}
     catch(e){Alert.alert('Cerrar sesión',errorMessage(e));}
-    finally{await clearCachedProfile();setProfile(null);setUserId(null);setScreen('home');}
+    finally{await clearCachedProfile();setProfile(null);setUserId(null);setScreen('cultivos');}
   }
   if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
@@ -118,6 +118,7 @@ export default function App() {
     <View style={styles.top}><Text style={styles.topTitle}>Calidad Berries Pro</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
     <ScrollView contentContainerStyle={styles.body}>
       {screen!=='home'&&<Pressable onPress={()=>navigate('home')}><Text style={styles.back}>‹ Volver al inicio</Text></Pressable>}
+      {screen==='cultivos'&&<><Text style={styles.heading}>QUALYX · Cultivos</Text><Text style={styles.subtitle}>Selecciona el cultivo a muestrear</Text><Button title="🍓 Frambuesa · disponible" onPress={()=>navigate('home')}/><Text style={styles.notice}>Zarzamora, fresa y arándano: próximamente.</Text></>}
       {screen==='home'&&<>
         {dualPanel&&<Choice label="Panel de trabajo" options={['Administradora','Trabajadora']} value={panel==='admin'?'Administradora':'Trabajadora'} onChange={v=>setPanel(v==='Administradora'?'admin':'worker')}/>}
         <Text style={styles.heading}>Control de calidad</Text>
@@ -126,11 +127,19 @@ export default function App() {
           <Button title="Sincronizar ahora" onPress={async()=>{try{const r=await syncSamples(profile);setPending(r.pending);Alert.alert('Sincronización',`Subidos: ${r.uploaded}. Pendientes: ${r.pending}`);}catch(e){Alert.alert('Sin conexión',errorMessage(e));}}}/></View>
         {features.enable_sampling!==false&&<><Button title="Nuevo muestreo de andén" onPress={()=>navigate('anden')}/><Button title="Nuevo muestreo de proceso" onPress={()=>navigate('proceso')}/></>}
         {features.enable_semaforo!==false&&<Button title="Nuevo semáforo" onPress={()=>navigate('semaforo')}/>}
+        <Button title="Calculadora de defectos" onPress={()=>navigate('calculadora')}/>
+        <Button title="Pesos de clamshells" onPress={()=>navigate('pesos')}/>
+        <Button title="Ayuda visual de calidad" onPress={()=>navigate('ayuda')}/>
+        <Button title="Informes de calidad" onPress={()=>navigate('informes')}/>
         <Button title="Historial de este teléfono" onPress={()=>navigate('history')}/>
         {adminPanel&&<Button title="Trabajadores y muestreos en la nube" onPress={()=>navigate('team')}/>}
         <Pressable onPress={logout}><Text style={styles.logout}>Cerrar sesión</Text></Pressable>
       </>}
       {screen==='team'&&adminPanel&&<TeamView/>}
+      {screen==='calculadora'&&<CalculatorView/>}
+      {screen==='pesos'&&<WeightsView/>}
+      {screen==='ayuda'&&<HelpView/>}
+      {screen==='informes'&&<ReportsView/>}
       {screen==='history'&&<HistoryView profile={profile}/>}
       {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} onSaved={async()=>{setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
@@ -263,6 +272,67 @@ function TeamView(){
     {members.map(m=><View key={m.user_id} style={styles.card}><Text style={styles.label}>{m.display_name} · {m.role}</Text><Text>{m.email} · {m.puesto} · {m.active?'Activo':'Inactivo'}</Text></View>)}
     <Text style={styles.section}>Últimos muestreos en la nube</Text>
     {samples.map(m=><View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{String(m.tipo)} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text></View>)}
+  </>;
+}
+function CalculatorView(){
+  const [total,setTotal]=useState('100');
+  const [defects,setDefects]=useState('0');
+  const sample=n(total),affected=n(defects);
+  const valid=Number.isInteger(sample)&&sample>0&&Number.isInteger(affected)&&affected>=0&&affected<=sample;
+  return <><Text style={styles.heading}>Calculadora de defectos</Text><Text style={styles.subtitle}>Simulación sin guardar registros</Text>
+    <Input label="Frutos de la muestra" value={total} onChange={setTotal} keyboard="numeric"/>
+    <Input label="Frutos con defectos" value={defects} onChange={setDefects} keyboard="numeric"/>
+    <View style={styles.card}><Text style={styles.big}>{valid?(affected/sample*100).toFixed(1)+' %':'—'}</Text><Text>{valid?'Porcentaje de defectos':'Revisa los conteos'}</Text></View></>;
+}
+function WeightsView(){
+  const [weight,setWeight]=useState('');
+  const value=weight.trim()?Number(weight.replace(',','.')):NaN;
+  return <><Text style={styles.heading}>Pesos de clamshells</Text><Text style={styles.subtitle}>Verificación por presentación · gramos</Text>
+    <Input label="Peso medido (g)" value={weight} onChange={setWeight} keyboard="numeric"/>
+    {presentaciones.map(p=><View key={p.name} style={styles.card}><Text style={styles.label}>{p.name}</Text>
+      <Text>Rango: {p.min}–{p.max} g</Text><Text style={{color:Number.isFinite(value)?value>=p.min&&value<=p.max?C.green:C.danger:C.muted}}>{Number.isFinite(value)?value>=p.min&&value<=p.max?'Dentro de rango':'Fuera de rango':'Ingresa un peso'}</Text></View>)}</>;
+}
+function HelpView(){
+  return <><Text style={styles.heading}>Ayuda visual de calidad</Text><Text style={styles.subtitle}>Criterios de referencia; consulta el protocolo de la empresa antes de determinar una disposición.</Text>
+    <Text style={styles.section}>Condición y apariencia · Andenes</Text>
+    {andenDefects.map(d=><View key={d.key} style={styles.card}><Text style={styles.label}>{d.label}</Text><Text>{d.category==='condicion'?'Condición':'Apariencia'}</Text>{d.key==='Excreta de pajaro'&&<Text style={{color:C.danger}}>Un fruto implica rechazo automático</Text>}</View>)}
+    <Text style={styles.section}>Defectos de fruta proceso</Text>
+    {procesoDefects.map(d=><View key={d.key} style={styles.card}><Text style={styles.label}>{d.label}</Text><Text>{d.category}</Text></View>)}</>;
+}
+function ReportsView(){
+  const [period,setPeriod]=useState('Hoy');
+  const [rancho,setRancho]=useState('Todos');
+  const [rows,setRows]=useState<Record<string,unknown>[]>([]);
+  const [loading,setLoading]=useState(false);
+  const load=async()=>{
+    setLoading(true);
+    try{
+      const days=period==='Hoy'?1:period==='7 días'?7:30;
+      const from=new Date();from.setHours(0,0,0,0);from.setDate(from.getDate()-(days-1));
+      const results:Record<string,unknown>[]=[];
+      for(const table of ['muestreos_anden','muestreos_proceso'] as const){
+        let query=supabase.from(table).select('uuid,fecha,rancho,disposicion,pct_condicion,pct_apariencia,total_defectos,potencial_empacable').gte('fecha',from.toISOString()).order('fecha',{ascending:false}).limit(500);
+        // Ambas tablas no comparten todas las columnas.
+        const columns=table==='muestreos_anden'?'uuid,fecha,rancho,disposicion,pct_condicion,pct_apariencia':'uuid,fecha,rancho,total_defectos,potencial_empacable';
+        let q=supabase.from(table).select(columns).gte('fecha',from.toISOString()).order('fecha',{ascending:false}).limit(500);
+        if(rancho!=='Todos')q=q.eq('rancho',rancho);
+        const {data,error}=await q;
+        if(error)throw error;
+        results.push(...(data||[]).map(x=>({...x,tabla:table})));
+      }
+      setRows(results);
+    }catch(e){Alert.alert('Informes',errorMessage(e));}finally{setLoading(false);}
+  };
+  const anden=rows.filter(r=>r.tabla==='muestreos_anden'),proceso=rows.filter(r=>r.tabla==='muestreos_proceso');
+  const rejected=anden.filter(r=>r.disposicion==='RECHAZO').length;
+  const avg=proceso.length?proceso.reduce((s,r)=>s+Number(r.potencial_empacable||0),0)/proceso.length:0;
+  return <><Text style={styles.heading}>Informes de calidad</Text>
+    <Choice label="Periodo" options={['Hoy','7 días','30 días']} value={period} onChange={setPeriod}/>
+    <Choice label="Rancho" options={['Todos',...ranchos]} value={rancho} onChange={setRancho}/>
+    <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/>
+    <View style={styles.card}><Text style={styles.label}>Andenes: {anden.length} · Rechazos: {rejected}</Text>
+      <Text style={styles.label}>Proceso: {proceso.length} · Potencial empacable promedio: {avg.toFixed(1)}%</Text></View>
+    {rows.map((r,i)=><View key={String(r.uuid)+String(i)} style={styles.card}><Text>{r.tabla==='muestreos_anden'?'Andén':'Proceso'} · {String(r.rancho)}</Text><Text>{String(r.fecha).slice(0,10)} · {String(r.disposicion||('Empacable '+Number(r.potencial_empacable||0).toFixed(1)+'%'))}</Text></View>)}
   </>;
 }
 function HistoryView({profile}:{profile:Profile}){
