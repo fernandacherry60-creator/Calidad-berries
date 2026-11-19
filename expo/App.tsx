@@ -319,7 +319,7 @@ function ReportsView(){
         if(rancho!=='Todos')q=q.eq('rancho',rancho);
         const {data,error}=await q;
         if(error)throw error;
-        results.push(...(data||[]).map(x=>({...x,tabla:table})));
+        results.push(...((data||[]) as unknown as Record<string,unknown>[]).map(x=>({...x,tabla:table})));
       }
       setRows(results);
     }catch(e){Alert.alert('Informes',errorMessage(e));}finally{setLoading(false);}
@@ -429,7 +429,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
       if(editing){
         // Preservar la identidad y la fecha originales para evitar duplicados.
         const original=JSON.parse(editing.payload) as Record<string,unknown>;
-        const changes={...payload,uuid:editing.uuid,fecha:editing.fecha};
+        const changes:Record<string,unknown>={...payload,uuid:editing.uuid,fecha:editing.fecha};
         const updated={...original,...changes};
         if(editing.synced){
           const {uuid:_uuid,fecha:_fecha,owner_id:_owner,usuario_email:_email,usuario_nombre:_nombre,usuario_puesto:_puesto,evaluador:_evaluador,...fields}=changes;
