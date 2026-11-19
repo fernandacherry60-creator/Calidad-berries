@@ -109,7 +109,7 @@ export default function App() {
     catch(e){Alert.alert('Cerrar sesión',errorMessage(e));}
     finally{await clearCachedProfile();setProfile(null);setUserId(null);setScreen('cultivos');}
   }
-  if(busy)return <View style={styles.center}><ActivityIndicator color={C.green} size="large"/></View>;
+  if(busy)return <View style={styles.center}><Text style={{fontSize:36,fontWeight:"800",color:C.green,textAlign:"center"}}>QUALYX</Text><Text style={{fontSize:15,color:C.muted,marginVertical:16}}>Control de calidad · Frambuesa</Text><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
   const navigate=(next:Screen)=>{if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);setScreen(next);};
