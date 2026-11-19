@@ -109,7 +109,7 @@ export default function App() {
     catch(e){Alert.alert('Cerrar sesión',errorMessage(e));}
     finally{await clearCachedProfile();setProfile(null);setUserId(null);setScreen('cultivos');}
   }
-  if(busy)return <View style={styles.center}><Text style={{fontSize:36,fontWeight:"800",color:C.green,textAlign:"center"}}>QUALYX</Text><Text style={{fontSize:15,color:C.muted,marginVertical:16}}>Control de calidad · Frambuesa</Text><ActivityIndicator color={C.green} size="large"/></View>;
+  if(busy)return <View style={styles.center}><Text style={{fontSize:36,fontWeight:"800",color:C.green,textAlign:"center"}}>QUALYX</Text><Text style={{fontSize:15,color:C.muted,marginVertical:16}}>Control de Calidad Berries</Text><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
   const navigate=(next:Screen)=>{if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);setScreen(next);};
@@ -117,7 +117,7 @@ export default function App() {
   const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
   return <View style={styles.page}>
-    <View style={styles.top}><Text style={styles.topTitle}>Calidad Berries Pro</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
+    <View style={styles.top}><Text style={styles.topTitle}>QUALYX Pro</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
     <ScrollView contentContainerStyle={styles.body}>
       {screen!=='home'&&<Pressable onPress={()=>navigate('home')}><Text style={styles.back}>‹ Volver al inicio</Text></Pressable>}
       {screen==='cultivos'&&<><Text style={styles.heading}>QUALYX · Cultivos</Text><Text style={styles.subtitle}>Selecciona el cultivo a muestrear</Text><Button title="🍓 Frambuesa · disponible" onPress={()=>navigate('home')}/><Text style={styles.notice}>Zarzamora, fresa y arándano: próximamente.</Text></>}
