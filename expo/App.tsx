@@ -117,7 +117,7 @@ export default function App() {
   const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
   return <View style={styles.page}>
-    <View style={styles.top}><Text style={styles.topTitle}>QUALYX Pro</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
+    <View style={styles.top}><Text style={styles.topTitle}>QUALYX</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
     <ScrollView contentContainerStyle={styles.body}>
       {screen!=='home'&&<Pressable onPress={()=>navigate('home')}><Text style={styles.back}>‹ Volver al inicio</Text></Pressable>}
       {screen==='cultivos'&&<><Text style={styles.heading}>QUALYX · Cultivos</Text><Text style={styles.subtitle}>Selecciona el cultivo a muestrear</Text><Button title="🍓 Frambuesa · disponible" onPress={()=>navigate('home')}/><Text style={styles.notice}>Zarzamora, fresa y arándano: próximamente.</Text></>}
@@ -189,8 +189,8 @@ function AuthView({userId,onDone,onLogout,onPanel}:{userId:string|null;onDone:()
   return <ScrollView contentContainerStyle={styles.entryPage} keyboardShouldPersistTaps="handled">
     <View style={styles.entryCenter}>
       <View style={styles.entryCherry}><Text style={styles.entryCherryText}>🍓</Text></View>
-      <Text style={styles.entryBrand}>Calidad Berries</Text>
-      <Text style={styles.entryBrandPro}>Pro</Text>
+      <Text style={styles.entryBrand}>QUALYX</Text>
+      <Text style={styles.entryBrandPro}>Control de Calidad Berries</Text>
       <View style={styles.entryRule}/>
       {selected===null?<>
         <Pressable style={styles.entryPrimary} onPress={()=>{setSelected('admin');}}>
@@ -222,7 +222,7 @@ function ResetPasswordView({onComplete}:{onComplete:()=>Promise<void>}){
   const [confirm,setConfirm]=useState('');
   const [saving,setSaving]=useState(false);
   return <ScrollView contentContainerStyle={styles.entryPage}><View style={styles.entryCenter}>
-    <Text style={styles.entryBrand}>Calidad Berries</Text><Text style={styles.entryBrandPro}>Pro</Text>
+    <Text style={styles.entryBrand}>QUALYX</Text><Text style={styles.entryBrandPro}>Control de Calidad Berries</Text>
     <View style={styles.entryLoginCard}><Text style={styles.entryLoginTitle}>Establecer contraseña nueva</Text>
       <Text style={styles.entryLoginHint}>El enlace de recuperación ya abrió una sesión temporal. Guarda aquí tu nueva contraseña.</Text>
       <Input label="Contraseña nueva (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
@@ -474,7 +474,7 @@ const styles=StyleSheet.create({
   entryCherry:{height:92,width:92,borderRadius:46,backgroundColor:'#FBE5E2',alignItems:'center',justifyContent:'center',marginBottom:16},
   entryCherryText:{fontSize:52},
   entryBrand:{fontSize:43,fontStyle:'italic',fontFamily:'serif',fontWeight:'700',color:'#A52A35',textAlign:'center',letterSpacing:-1},
-  entryBrandPro:{fontSize:32,fontStyle:'italic',fontFamily:'serif',color:'#BD8A30',marginTop:-6,textAlign:'center'},
+  entryBrandPro:{fontSize:17,fontStyle:'italic',fontFamily:'serif',color:'#BD8A30',marginTop:-6,textAlign:'center'},
   entryRule:{width:65,height:2,backgroundColor:'#BD8A30',marginTop:23,marginBottom:34},
   entryPrimary:{backgroundColor:C.burgundy,paddingVertical:19,borderRadius:17,width:'100%',alignItems:'center',marginBottom:14},
   entryPrimaryText:{fontStyle:'italic',fontFamily:'serif',color:'#FFFFFF',fontSize:17,fontWeight:'800'},
