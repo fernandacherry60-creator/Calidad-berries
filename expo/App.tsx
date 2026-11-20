@@ -237,31 +237,6 @@ function ResetPasswordView({onComplete}:{onComplete:()=>Promise<void>}){
       <Text style={styles.entryLoginHint}>El enlace de recuperación ya abrió una sesión temporal. Guarda aquí tu nueva contraseña.</Text>
       <Input label="Contraseña nueva (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
       <Input label="Confirmar contraseña" value={confirm} onChange={setConfirm} secure/>
-      {kind!=='semaforo'&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
-    <Modal visible={sharePreview} animationType="slide" onRequestClose={()=>setSharePreview(false)}>
-      <View style={styles.capturePreviewPage}>
-        <View style={styles.capturePreviewTop}><Text style={styles.capturePreviewBrand}>QUALYX · {kind==='anden'?'ANDENES':'FRUTA PROCESO'}</Text><Pressable onPress={()=>setSharePreview(false)} accessibilityLabel="Cerrar resumen"><Text style={styles.capturePreviewClose}>✕</Text></Pressable></View>
-        <View style={styles.capturePreviewSheet}>
-          <Text style={styles.capturePreviewTitle}>RESUMEN DE MUESTREO</Text>
-          <Text style={styles.capturePreviewMeta}>{new Date().toLocaleDateString('es-MX')} · {rancho}{sector?' · '+sector:''}</Text>
-          <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Defectos: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
-          {andenPreview&&<Text style={styles.capturePreviewStatus}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
-          {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {procesoPreview.pct_proceso.toFixed(1)}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
-          <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTO</Text><Text style={styles.capturePreviewColumnTitle}>CANT.</Text><Text style={styles.capturePreviewColumnTitle}>%</Text></View>
-          <View style={styles.capturePreviewGrid}>
-            {activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:activeDefects.length>14?3:activeDefects.length>8?6:10}]}>
-              <Text numberOfLines={2} style={[styles.capturePreviewDefect,{fontSize:activeDefects.length>14?10:activeDefects.length>8?12:14}]}>{d.label}</Text>
-              <Text style={styles.capturePreviewCount}>{counts[d.key]}</Text>
-              <Text style={styles.capturePreviewPercent}>{totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>
-            </View>)}
-          </View>
-          {activeDefects.length===0&&<Text style={styles.capturePreviewEmpty}>Sin defectos registrados</Text>}
-          <View style={styles.capturePreviewFooter}><Text style={styles.capturePreviewFooterText}>TOTAL {countedPreview} / {totalPreview}</Text><Text style={styles.capturePreviewFooterText}>{totalPreview>0?(countedPreview/totalPreview*100).toFixed(1):'—'}%</Text></View>
-          {!validPreview&&<Text style={{color:C.danger,fontSize:11}}>Revisar cantidades antes de guardar.</Text>}
-        </View>
-        <Text style={styles.capturePreviewHint}>Vista compacta para captura de pantalla. Si el contenido supera la altura del teléfono, usa una captura con desplazamiento.</Text>
-      </View>
-    </Modal></>}
     <Button title={saving?'Guardando…':'Guardar contraseña'} disabled={saving||password.length<8||password!==confirm} onPress={async()=>{
         setSaving(true);try{const {error}=await supabase.auth.updateUser({password});if(error)throw error;Alert.alert('Contraseña actualizada','Ya puedes iniciar sesión con tu contraseña nueva.',[{text:'Continuar',onPress:()=>void onComplete()}]);}catch(e){Alert.alert('No se pudo actualizar',errorMessage(e));}finally{setSaving(false);}
       }}/>
@@ -518,6 +493,31 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
        </View>
     </>}
     {kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
+      {kind!=='semaforo'&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
+    <Modal visible={sharePreview} animationType="slide" onRequestClose={()=>setSharePreview(false)}>
+      <View style={styles.capturePreviewPage}>
+        <View style={styles.capturePreviewTop}><Text style={styles.capturePreviewBrand}>QUALYX · {kind==='anden'?'ANDENES':'FRUTA PROCESO'}</Text><Pressable onPress={()=>setSharePreview(false)} accessibilityLabel="Cerrar resumen"><Text style={styles.capturePreviewClose}>✕</Text></Pressable></View>
+        <View style={styles.capturePreviewSheet}>
+          <Text style={styles.capturePreviewTitle}>RESUMEN DE MUESTREO</Text>
+          <Text style={styles.capturePreviewMeta}>{new Date().toLocaleDateString('es-MX')} · {rancho}{sector?' · '+sector:''}</Text>
+          <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Defectos: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
+          {andenPreview&&<Text style={styles.capturePreviewStatus}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
+          {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {procesoPreview.pct_proceso.toFixed(1)}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
+          <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTO</Text><Text style={styles.capturePreviewColumnTitle}>CANT.</Text><Text style={styles.capturePreviewColumnTitle}>%</Text></View>
+          <View style={styles.capturePreviewGrid}>
+            {activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:activeDefects.length>14?3:activeDefects.length>8?6:10}]}>
+              <Text numberOfLines={2} style={[styles.capturePreviewDefect,{fontSize:activeDefects.length>14?10:activeDefects.length>8?12:14}]}>{d.label}</Text>
+              <Text style={styles.capturePreviewCount}>{counts[d.key]}</Text>
+              <Text style={styles.capturePreviewPercent}>{totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>
+            </View>)}
+          </View>
+          {activeDefects.length===0&&<Text style={styles.capturePreviewEmpty}>Sin defectos registrados</Text>}
+          <View style={styles.capturePreviewFooter}><Text style={styles.capturePreviewFooterText}>TOTAL {countedPreview} / {totalPreview}</Text><Text style={styles.capturePreviewFooterText}>{totalPreview>0?(countedPreview/totalPreview*100).toFixed(1):'—'}%</Text></View>
+          {!validPreview&&<Text style={{color:C.danger,fontSize:11}}>Revisar cantidades antes de guardar.</Text>}
+        </View>
+        <Text style={styles.capturePreviewHint}>Vista compacta para captura de pantalla. Si el contenido supera la altura del teléfono, usa una captura con desplazamiento.</Text>
+      </View>
+    </Modal></>}
     <Button title={saving?'Guardando…':editing?'Revisar modificaciones':'Revisar y confirmar muestreo'} disabled={saving} onPress={()=>{
       const total=n(frutos);
       const counted=defects.reduce((s,d)=>s+n(counts[d.key]||'0'),0);
