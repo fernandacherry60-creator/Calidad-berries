@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
@@ -237,7 +237,32 @@ function ResetPasswordView({onComplete}:{onComplete:()=>Promise<void>}){
       <Text style={styles.entryLoginHint}>El enlace de recuperación ya abrió una sesión temporal. Guarda aquí tu nueva contraseña.</Text>
       <Input label="Contraseña nueva (mínimo 8 caracteres)" value={password} onChange={setPassword} secure/>
       <Input label="Confirmar contraseña" value={confirm} onChange={setConfirm} secure/>
-      <Button title={saving?'Guardando…':'Guardar contraseña'} disabled={saving||password.length<8||password!==confirm} onPress={async()=>{
+      {kind!=='semaforo'&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
+    <Modal visible={sharePreview} animationType="slide" onRequestClose={()=>setSharePreview(false)}>
+      <View style={styles.capturePreviewPage}>
+        <View style={styles.capturePreviewTop}><Text style={styles.capturePreviewBrand}>QUALYX · {kind==='anden'?'ANDENES':'FRUTA PROCESO'}</Text><Pressable onPress={()=>setSharePreview(false)} accessibilityLabel="Cerrar resumen"><Text style={styles.capturePreviewClose}>✕</Text></Pressable></View>
+        <View style={styles.capturePreviewSheet}>
+          <Text style={styles.capturePreviewTitle}>RESUMEN DE MUESTREO</Text>
+          <Text style={styles.capturePreviewMeta}>{new Date().toLocaleDateString('es-MX')} · {rancho}{sector?' · '+sector:''}</Text>
+          <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Defectos: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
+          {andenPreview&&<Text style={styles.capturePreviewStatus}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
+          {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {procesoPreview.pct_proceso.toFixed(1)}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
+          <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTO</Text><Text style={styles.capturePreviewColumnTitle}>CANT.</Text><Text style={styles.capturePreviewColumnTitle}>%</Text></View>
+          <View style={styles.capturePreviewGrid}>
+            {activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:activeDefects.length>14?3:activeDefects.length>8?6:10}]}>
+              <Text numberOfLines={2} style={[styles.capturePreviewDefect,{fontSize:activeDefects.length>14?10:activeDefects.length>8?12:14}]}>{d.label}</Text>
+              <Text style={styles.capturePreviewCount}>{counts[d.key]}</Text>
+              <Text style={styles.capturePreviewPercent}>{totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>
+            </View>)}
+          </View>
+          {activeDefects.length===0&&<Text style={styles.capturePreviewEmpty}>Sin defectos registrados</Text>}
+          <View style={styles.capturePreviewFooter}><Text style={styles.capturePreviewFooterText}>TOTAL {countedPreview} / {totalPreview}</Text><Text style={styles.capturePreviewFooterText}>{totalPreview>0?(countedPreview/totalPreview*100).toFixed(1):'—'}%</Text></View>
+          {!validPreview&&<Text style={{color:C.danger,fontSize:11}}>Revisar cantidades antes de guardar.</Text>}
+        </View>
+        <Text style={styles.capturePreviewHint}>Vista compacta para captura de pantalla. Si el contenido supera la altura del teléfono, usa una captura con desplazamiento.</Text>
+      </View>
+    </Modal></>}
+    <Button title={saving?'Guardando…':'Guardar contraseña'} disabled={saving||password.length<8||password!==confirm} onPress={async()=>{
         setSaving(true);try{const {error}=await supabase.auth.updateUser({password});if(error)throw error;Alert.alert('Contraseña actualizada','Ya puedes iniciar sesión con tu contraseña nueva.',[{text:'Continuar',onPress:()=>void onComplete()}]);}catch(e){Alert.alert('No se pudo actualizar',errorMessage(e));}finally{setSaving(false);}
       }}/>
     </View></View></ScrollView>;
@@ -389,9 +414,12 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
   const [categoria,setCategoria]=useState('Condición'),[nivel,setNivel]=useState('ok');
   const [counts,setCounts]=useState<Record<string,string>>({});
   const [saving,setSaving]=useState(false);
+  const [sharePreview,setSharePreview]=useState(false);
   const defects=kind==='anden'?andenDefects:procesoDefects;
   const totalPreview=n(frutos);
   const previewCounts=Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')]));
+  const activeDefects=defects.filter(d=>n(counts[d.key]||'0')>0);
+  const countedPreview=Object.values(previewCounts).reduce((sum,value)=>sum+value,0);
   const validPreview=totalPreview>0&&Object.values(previewCounts).reduce((s,v)=>s+v,0)<=totalPreview;
   const andenPreview=kind==='anden'&&validPreview?scoreAnden(previewCounts,totalPreview,n(larvas)):null;
   const procesoPreview=kind==='proceso'&&validPreview?scoreProceso(previewCounts,totalPreview,n(cajas),n(taras),empacable.trim()?n(empacable):undefined):null;
@@ -503,6 +531,23 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
   </>;
 }
 const styles=StyleSheet.create({
+  capturePreviewPage:{flex:1,backgroundColor:'#FAF7F1',paddingHorizontal:12,paddingTop:34,paddingBottom:14,justifyContent:'center'},
+  capturePreviewTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8},capturePreviewBrand:{fontSize:14,fontWeight:'800',color:'#6A2433'},capturePreviewClose:{fontSize:23,color:'#6A2433',paddingHorizontal:12},
+  capturePreviewSheet:{backgroundColor:'#FFFFFF',borderRadius:12,borderWidth:1,borderColor:'#E3DDD6',overflow:'hidden',paddingBottom:8},
+  capturePreviewTitle:{backgroundColor:'#F8DFE8',textAlign:'center',color:'#BE3562',fontWeight:'800',fontSize:16,padding:10},
+  capturePreviewMeta:{fontSize:11,color:'#454B48',paddingHorizontal:10,paddingTop:6},
+  capturePreviewStatus:{fontSize:12,fontWeight:'800',color:'#17663B',backgroundColor:'#E5F3E8',padding:9,marginTop:7},
+  capturePreviewColumns:{flexDirection:'row',justifyContent:'space-between',backgroundColor:'#EAE6E0',padding:8},
+  capturePreviewColumnTitle:{fontSize:10,fontWeight:'800',color:'#444'},
+  capturePreviewGrid:{flexDirection:'row',flexWrap:'wrap',paddingHorizontal:5,paddingTop:4},
+  capturePreviewItem:{width:'50%',flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:'#EEEAE5',paddingHorizontal:5,gap:3},
+  capturePreviewDefect:{flex:1,color:'#222',fontWeight:'600'},
+  capturePreviewCount:{minWidth:18,textAlign:'right',fontSize:12,fontWeight:'800',color:'#222'},
+  capturePreviewPercent:{minWidth:35,textAlign:'right',fontSize:11,color:'#4D5752'},
+  capturePreviewEmpty:{textAlign:'center',padding:20,color:'#777'},
+  capturePreviewFooter:{backgroundColor:'#E4F2E6',padding:10,flexDirection:'row',justifyContent:'space-between'},
+  capturePreviewFooterText:{fontSize:13,fontWeight:'800',color:'#17663B'},
+  capturePreviewHint:{fontSize:11,textAlign:'center',color:'#686868',marginTop:10},
   dropdownHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:C.white,borderWidth:1,borderColor:C.line,borderRadius:14,paddingVertical:16,paddingHorizontal:17},
   dropdownValue:{fontSize:16,color:C.ink,fontStyle:'italic',flex:1},
   dropdownArrow:{fontSize:24,color:C.burgundy,marginLeft:12},
