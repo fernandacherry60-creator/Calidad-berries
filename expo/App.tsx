@@ -142,9 +142,9 @@ export default function App() {
         <ModuleTile icon="🧮" title="Calculadora de defectos" description="Porcentajes de la muestra sin guardar" onPress={()=>navigate('calculadora')}/>
         <ModuleTile icon="⚖️" title="Pesos de clamshells" description="Verificar rangos por presentación" onPress={()=>navigate('pesos')}/>
         <ModuleTile icon="📖" title="Ayuda visual" description="Criterios de calidad y defectos" onPress={()=>navigate('ayuda')}/>
-        <Button title="Informes de calidad" onPress={()=>navigate('informes')}/>
-        <Button title="Historial de este teléfono" onPress={()=>navigate('history')}/>
-        {adminPanel&&<Button title="Trabajadores y muestreos en la nube" onPress={()=>navigate('team')}/>}
+        <ModuleTile icon="📊" title="Informes de calidad" description="Reportes, estadísticas y gráficas de muestreos" onPress={()=>navigate('informes')}/>
+        <ModuleTile icon="🕘" title="Historial de este teléfono" description="Consultar y editar muestreos guardados" onPress={()=>navigate('history')}/>
+        {adminPanel&&<ModuleTile icon="☁️" title="Trabajadores y muestreos en la nube" description="Administrar personal y registros sincronizados" onPress={()=>navigate('team')}/>}
         <Pressable onPress={logout}><Text style={styles.logout}>Cerrar sesión</Text></Pressable>
       </>}
       {screen==='team'&&adminPanel&&<TeamView onEdit={openEdit}/>}
