@@ -16,8 +16,16 @@ const Input = ({label,value,onChange,secure=false,keyboard='default'}: {label:st
   <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><TextInput autoCapitalize={keyboard==='email-address'?'none':'sentences'} secureTextEntry={secure} keyboardType={keyboard} style={fieldStyle} value={value} onChangeText={onChange}/></View>;
 const ModuleTile = ({icon,title,description,onPress}:{icon:string;title:string;description:string;onPress:()=>void}) =>
   <Pressable accessibilityRole="button" onPress={onPress} style={styles.moduleTile}><Text style={styles.moduleIcon}>{icon}</Text><View style={{flex:1}}><Text style={styles.moduleTitle}>{title}</Text><Text style={styles.moduleDescription}>{description}</Text></View><Text style={styles.moduleArrow}>›</Text></Pressable>;
-const Choice = ({label,options,value,onChange}: {label:string;options:string[];value:string;onChange:(v:string)=>void}) =>
-  <View style={{marginBottom:12}}><Text style={styles.label}>{label}</Text><View style={styles.choices}>{options.map(v=><Pressable key={v} onPress={()=>onChange(v)} style={[styles.chip,value===v&&styles.selected]}><Text style={{color:value===v?C.white:C.ink,fontStyle:'italic'}}>{v}</Text></Pressable>)}</View></View>;
+const Choice = ({label,options,value,onChange}: {label:string;options:string[];value:string;onChange:(v:string)=>void}) => {
+  const [expanded,setExpanded]=useState(false);
+  return <View style={{marginBottom:12}}>
+    <Text style={styles.label}>{label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={label+': '+value} accessibilityState={{expanded}} onPress={()=>setExpanded(open=>!open)} style={styles.dropdownHeader}>
+      <Text style={styles.dropdownValue}>{value||'Seleccionar'}</Text><Text style={styles.dropdownArrow}>{expanded?'▴':'▾'}</Text>
+    </Pressable>
+    {expanded&&<View style={styles.dropdownOptions}>{options.map(v=><Pressable key={v} accessibilityRole="button" accessibilityState={{selected:value===v}} onPress={()=>{onChange(v);setExpanded(false);}} style={[styles.dropdownOption,value===v&&styles.dropdownOptionSelected]}><Text style={[styles.dropdownOptionText,value===v&&{color:C.burgundy,fontWeight:'700'}]}>{v}</Text>{value===v&&<Text style={{color:C.gold}}>✓</Text>}</Pressable>)}</View>}
+  </View>;
+};
 const errorMessage = (e:unknown):string => {
   if(e instanceof Error)return e.message;
   if(typeof e==='string')return e;
@@ -495,6 +503,13 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
   </>;
 }
 const styles=StyleSheet.create({
+  dropdownHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',backgroundColor:C.white,borderWidth:1,borderColor:C.line,borderRadius:14,paddingVertical:16,paddingHorizontal:17},
+  dropdownValue:{fontSize:16,color:C.ink,fontStyle:'italic',flex:1},
+  dropdownArrow:{fontSize:24,color:C.burgundy,marginLeft:12},
+  dropdownOptions:{backgroundColor:C.white,borderWidth:1,borderColor:C.line,borderRadius:14,marginTop:5,overflow:'hidden'},
+  dropdownOption:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',paddingVertical:13,paddingHorizontal:17,borderBottomWidth:StyleSheet.hairlineWidth,borderBottomColor:C.line},
+  dropdownOptionSelected:{backgroundColor:'#FFF2DE'},
+  dropdownOptionText:{fontSize:15,color:C.ink,flex:1},
   moduleTile:{flexDirection:'row',alignItems:'center',backgroundColor:C.white,borderWidth:1,borderColor:C.line,borderRadius:17,padding:17,marginBottom:12,gap:14},
   moduleIcon:{fontSize:27,width:40,textAlign:'center'},moduleTitle:{fontSize:19,fontWeight:'700',color:C.ink},moduleDescription:{fontSize:12,color:C.muted,marginTop:4,lineHeight:18},moduleArrow:{fontSize:28,color:C.gold},
   defectRow:{flexDirection:'row',alignItems:'center',backgroundColor:C.white,borderWidth:1,borderColor:C.line,borderRadius:14,padding:12,marginBottom:10,gap:6},
