@@ -66,7 +66,10 @@ export default function App() {
     const user=session?.user;
     if(!user){setUserId(null);setProfile(null);return;}
     // Comprobar que la sesión guardada sigue perteneciendo a un usuario real.
+    const network=await NetInfo.fetch();
+    if(network.isConnected===false||network.isInternetReachable===false){const cached=await getCachedProfile(user.id);setUserId(user.id);setProfile(cached);if(cached)setPending(await pendingCount(user.id));return;}
     const {data:validated,error:authError}=await supabase.auth.getUser();
+    if(authError&&(!authError.status||authError.status>=500)){const cached=await getCachedProfile(user.id);setUserId(user.id);setProfile(cached);if(cached)setPending(await pendingCount(user.id));return;}
     if(authError||!validated.user||validated.user.id!==user.id){
       await supabase.auth.signOut({scope:'local'});
       setUserId(null);setProfile(null);return;
@@ -390,6 +393,9 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
   const [counts,setCounts]=useState<Record<string,string>>({});
   const [saving,setSaving]=useState(false);
   const [sharePreview,setSharePreview]=useState(false);
+  const [step,setStep]=useState(1);
+  const processKg=n(cajas)*2.23+n(taras)*3;
+  const liveProcess=processKg>0?n(taras)*3/processKg*100:null;
   const defects=kind==='anden'?andenDefects:procesoDefects;
   const totalPreview=n(frutos);
   const previewCounts=Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')]));
@@ -459,7 +465,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         Alert.alert('Guardado','Registro almacenado en el teléfono. Se sincronizará al tener conexión.');
       }
       if(!editing&&kind==='anden'&&continueAnden){
-        setCounts({});setLarvas('0');setPeso('');setNota('');
+        setStep(1);setCounts({});setLarvas('0');setPeso('');setNota('');
         // Mantener rancho, sector, variedad, presentación, cuadrilla y embaladora.
       }else await onSaved();
     }catch(e){Alert.alert('Revisar captura',errorMessage(e));}finally{setSaving(false);}
@@ -467,13 +473,15 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
   return <><Text style={styles.heading}>{editing?'Modificar muestreo':kind==='anden'?'Muestreo de andén':kind==='proceso'?'Muestreo de proceso':'Semáforo'}</Text>
     <Text style={styles.subtitle}>Frambuesa · captura segura sin conexión</Text>
     {kind==='semaforo'?<><Input label="Categoría" value={categoria} onChange={setCategoria}/><Choice label="Nivel" options={['ok','warn','danger']} value={nivel} onChange={setNivel}/><Input label="Observaciones" value={nota} onChange={setNota}/></>:<>
-      <Choice label="Rancho" options={ranchos} value={rancho} onChange={setRancho}/>
+      <Text style={styles.section}>Paso {step} de 3 · {step===1?'Datos generales':step===2?'Formato de muestreo':'Resultado final'}</Text>
+      {step===1&&<><Choice label="Rancho" options={ranchos} value={rancho} onChange={setRancho}/>
       {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Choice label="Variedad" options={variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
       <Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric"/>
-      {kind==='proceso'&&<><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric"/><Text style={styles.notice}>Cada tara equivale a 3 kg.</Text><Input label="Potencial empacable (%) · captura obligatoria" value={empacable} onChange={setEmpacable} keyboard="numeric"/></>}
+      {kind==='proceso'&&<><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric"/><Text style={styles.notice}>Cada tara equivale a 3 kg.</Text><Text style={styles.notice}>Porcentaje de proceso: {liveProcess===null?'—':liveProcess.toFixed(1)+'%'}</Text><Input label="Potencial empacable (%) · captura obligatoria" value={empacable} onChange={setEmpacable} keyboard="numeric"/></>}
       <Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric"/>
       {kind==='anden'&&<Text style={styles.notice}>Canastos sugeridos: {canastosPorCajas(n(cajas))} (1 por cada 24 cajas o fracción)</Text>}
-      <Text style={styles.section}>Defectos encontrados</Text>
+      <Button title="Siguiente · Formato de muestreo" onPress={()=>{if(!Number.isInteger(n(frutos))||n(frutos)<=0||n(cajas)<0||n(taras)<0){Alert.alert('Revisar datos','Comprueba las cantidades');return;}setStep(2);}}/></>}
+      {step===2&&<><Text style={styles.label}>Frutos: {frutos} · Embaladora: {embaladora||'—'}</Text><Text style={styles.section}>Defectos encontrados</Text>
       {defects.map(d=><View key={d.key} style={styles.defectRow}>
           <View style={{flex:1}}><Text style={styles.defectTitle}>{d.label}</Text><Text style={styles.defectCategory}>{d.category}</Text></View>
           <Pressable accessibilityLabel={'Restar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(Math.max(0,n(prev[d.key]||'0')-1))}))} style={styles.counterButton}><Text style={styles.counterText}>−</Text></Pressable>
@@ -481,7 +489,8 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
           <Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable>
         </View>)}
       {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
-       <View style={styles.card}>
+       <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}setStep(3);}}/></>}
+       {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.card}>
          <Text style={styles.section}>Resumen del muestreo</Text>
          <Text style={styles.label}>Rancho: {rancho} · Frutos: {frutos} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
          {!validPreview&&<Text style={{color:C.danger}}>Revisa el total de frutos y defectos antes de guardar.</Text>}
@@ -490,10 +499,10 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
            <Text>Agronomía: {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha: {procesoPreview.area_cosecha.toFixed(1)}%</Text>
            <Text>Actividades: {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad: {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
          {defects.filter(d=>n(counts[d.key]||'0')>0).map(d=><Text key={d.key} style={styles.label}>{d.label}: {counts[d.key]} fruto(s) · {totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>)}
-       </View>
+       </View></>}
     </>}
-    {kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
-      {kind!=='semaforo'&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
+    {step===3&&kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
+      {step===3&&kind!=='semaforo'&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
     <Modal visible={sharePreview} animationType="slide" onRequestClose={()=>setSharePreview(false)}>
       <View style={styles.capturePreviewPage}>
         <View style={styles.capturePreviewTop}><Text style={styles.capturePreviewBrand}>QUALYX · {kind==='anden'?'ANDENES':'FRUTA PROCESO'}</Text><Pressable onPress={()=>setSharePreview(false)} accessibilityLabel="Cerrar resumen"><Text style={styles.capturePreviewClose}>✕</Text></Pressable></View>
@@ -502,7 +511,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
           <Text style={styles.capturePreviewMeta}>{new Date().toLocaleDateString('es-MX')} · {rancho}{sector?' · '+sector:''}</Text>
           <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Defectos: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
           {andenPreview&&<Text style={styles.capturePreviewStatus}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
-          {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {procesoPreview.pct_proceso.toFixed(1)}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
+          {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {(procesoPreview.pct_proceso?.toFixed(1)??'—')}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
           <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTO</Text><Text style={styles.capturePreviewColumnTitle}>CANT.</Text><Text style={styles.capturePreviewColumnTitle}>%</Text></View>
           <View style={styles.capturePreviewGrid}>
             {activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:activeDefects.length>14?3:activeDefects.length>8?6:10}]}>
@@ -518,7 +527,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         <Text style={styles.capturePreviewHint}>Vista compacta para captura de pantalla. Si el contenido supera la altura del teléfono, usa una captura con desplazamiento.</Text>
       </View>
     </Modal></>}
-    <Button title={saving?'Guardando…':editing?'Revisar modificaciones':'Revisar y confirmar muestreo'} disabled={saving} onPress={()=>{
+    {(step===3||kind==='semaforo')&&<Button title={saving?'Guardando…':editing?'Revisar modificaciones':'Revisar y confirmar muestreo'} disabled={saving} onPress={()=>{
       const total=n(frutos);
       const counted=defects.reduce((s,d)=>s+n(counts[d.key]||'0'),0);
       const score=kind==='anden'&&total>0?scoreAnden(Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')])),total,n(larvas)):null;
@@ -527,7 +536,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         {text:'Revisar',style:'cancel'},
         {text:editing?'Guardar cambios':'Confirmar y guardar',onPress:()=>{void save();}}
       ]);
-    }}/>
+    }}/>}
   </>;
 }
 const styles=StyleSheet.create({
