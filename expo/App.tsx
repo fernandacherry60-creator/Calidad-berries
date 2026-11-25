@@ -51,6 +51,11 @@ async function handleAuthLink(url:string):Promise<boolean> {
   return recovery;
 }
 
+async function withDeadline<T>(work:PromiseLike<T>,ms:number):Promise<T>{
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  try{return await Promise.race([Promise.resolve(work),new Promise<T>((_,reject)=>{timer=setTimeout(()=>reject(new Error('Tiempo de espera agotado')),ms);})]);}
+  finally{if(timer!==undefined)clearTimeout(timer);}
+}
 export default function App() {
   const [profile,setProfile]=useState<Profile|null>(null);
   const [userId,setUserId]=useState<string|null>(null);
@@ -62,40 +67,36 @@ export default function App() {
   const [pending,setPending]=useState(0);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
   const refresh=useCallback(async()=>{
-    const {data:{session}}=await supabase.auth.getSession();
+    const {data:{session}}=await withDeadline(supabase.auth.getSession(),5000);
     const user=session?.user;
     if(!user){setUserId(null);setProfile(null);return;}
-    // Comprobar que la sesión guardada sigue perteneciendo a un usuario real.
-    const network=await NetInfo.fetch();
-    if(network.isConnected===false||network.isInternetReachable===false){const cached=await getCachedProfile(user.id);setUserId(user.id);setProfile(cached);if(cached)setPending(await pendingCount(user.id));return;}
-    const {data:validated,error:authError}=await supabase.auth.getUser();
-    if(authError&&(!authError.status||authError.status>=500)){const cached=await getCachedProfile(user.id);setUserId(user.id);setProfile(cached);if(cached)setPending(await pendingCount(user.id));return;}
-    if(authError||!validated.user||validated.user.id!==user.id){
-      await supabase.auth.signOut({scope:'local'});
-      setUserId(null);setProfile(null);return;
-    }
-    setUserId(validated.user.id);
+    setUserId(user.id);
+    const cached=await getCachedProfile(user.id);
+    if(cached){setProfile(cached);setBusy(false);}
     let p:Profile|null=null;
     try {
-      p=await loadProfile(user.id);
-      if(!p&&user.email){await redeemPendingInvitation(user.email);p=await loadProfile(user.id);}
+      const {data:validated,error:authError}=await withDeadline(supabase.auth.getUser(),5000);
+      if(authError){
+        if(authError.status===401||authError.status===403){await clearCachedProfile();setProfile(null);setUserId(null);return;}
+        throw authError;
+      }
+      if(!validated.user||validated.user.id!==user.id){await clearCachedProfile();setProfile(null);setUserId(null);return;}
+      p=await withDeadline(loadProfile(user.id),5000);
+      if(!p&&user.email){await withDeadline(redeemPendingInvitation(user.email),5000);p=await withDeadline(loadProfile(user.id),5000);}
       if(p?.active)await cacheVerifiedProfile(p);
       else await clearCachedProfile();
-    } catch(e) {
-      // Sin internet: solo se acepta un perfil que antes fue validado por el servidor.
-      p=await getCachedProfile(user.id);
-    }
+    }catch(e){p=cached;}
     setProfile(p?.active?p:null);
-    if(p?.active)setPending(await pendingCount(p.user_id));
+    if(p?.active)void pendingCount(p.user_id).then(setPending).catch(()=>{});
   },[]);
   useEffect(()=>{
     let alive=true;
     (async()=>{try{
-      const initial=await Linking.getInitialURL();if(initial)setRecovering(await handleAuthLink(initial));
+      const initial=await withDeadline(Linking.getInitialURL(),2000).catch(()=>null);if(initial)setRecovering(await withDeadline(handleAuthLink(initial),8000));
       await refresh();
-    }catch(e){Alert.alert('Inicio',errorMessage(e));}finally{if(alive)setBusy(false);}})();
+    }catch(e){console.warn('Inicio',errorMessage(e));}finally{if(alive)setBusy(false);}})();
     const link=Linking.addEventListener('url',({url})=>{handleAuthLink(url).then(async recovery=>{if(recovery)setRecovering(true);await refresh();}).catch(e=>Alert.alert('Enlace',errorMessage(e)));});
-    const auth=supabase.auth.onAuthStateChange(()=>{setTimeout(()=>{refresh().catch(()=>{});},0);});
+    const auth=supabase.auth.onAuthStateChange((event)=>{if(event==='SIGNED_IN'||event==='SIGNED_OUT'||event==='USER_UPDATED')setTimeout(()=>{refresh().catch(()=>{});},0);});
     return ()=>{alive=false;link.remove();auth.data.subscription.unsubscribe();};
   },[refresh]);
   useEffect(()=>{
