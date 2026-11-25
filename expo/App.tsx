@@ -490,15 +490,17 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         </View>)}
       {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
        <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}setStep(3);}}/></>}
-       {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.card}>
-         <Text style={styles.section}>Resumen del muestreo</Text>
+       {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.capturePreviewSheet}>
+         <Text style={styles.capturePreviewTitle}>{kind==='anden'?'MUESTREO DE ANDÉN':'MUESTREO DE PROCESO'}</Text>
          <Text style={styles.label}>Rancho: {rancho} · Frutos: {frutos} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
          {!validPreview&&<Text style={{color:C.danger}}>Revisa el total de frutos y defectos antes de guardar.</Text>}
          {andenPreview&&<><Text style={styles.label}>Condición: {(andenPreview.pct_condicion*100).toFixed(1)}% · Apariencia: {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text><Text style={styles.label}>Resultado: {andenPreview.disposicion} · {andenPreview.puntos_total} puntos</Text></>}
          {procesoPreview&&<><Text style={styles.label}>Porcentaje de proceso: {procesoPreview.pct_proceso?.toFixed(1)??'—'}%</Text><Text style={styles.label}>Empacable (manual): {empacable||'Pendiente'}%</Text><Text style={styles.section}>Áreas de enfoque</Text>
            <Text>Agronomía: {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha: {procesoPreview.area_cosecha.toFixed(1)}%</Text>
            <Text>Actividades: {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad: {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
-         {defects.filter(d=>n(counts[d.key]||'0')>0).map(d=><Text key={d.key} style={styles.label}>{d.label}: {counts[d.key]} fruto(s) · {totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>)}
+         <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTOS · CANTIDAD · %</Text></View>
+         <View style={styles.capturePreviewGrid}>{activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:4}]}><Text style={[styles.capturePreviewDefect,{fontSize:11}]}>{d.label}</Text><Text style={styles.capturePreviewCount}>{counts[d.key]}</Text><Text style={styles.capturePreviewPercent}>{(n(counts[d.key]||'0')/totalPreview*100).toFixed(1)}%</Text></View>)}</View>
+         <View style={styles.capturePreviewFooter}><Text style={styles.capturePreviewFooterText}>FRUTOS CONTADOS</Text><Text style={styles.capturePreviewFooterText}>{countedPreview} / {totalPreview}</Text></View>
        </View></>}
     </>}
     {step===3&&kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
@@ -509,13 +511,13 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         <View style={styles.capturePreviewSheet}>
           <Text style={styles.capturePreviewTitle}>RESUMEN DE MUESTREO</Text>
           <Text style={styles.capturePreviewMeta}>{new Date().toLocaleDateString('es-MX')} · {rancho}{sector?' · '+sector:''}</Text>
-          <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Defectos: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
+          <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Contados: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
           {andenPreview&&<Text style={styles.capturePreviewStatus}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
           {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {(procesoPreview.pct_proceso?.toFixed(1)??'—')}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
           <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTO</Text><Text style={styles.capturePreviewColumnTitle}>CANT.</Text><Text style={styles.capturePreviewColumnTitle}>%</Text></View>
           <View style={styles.capturePreviewGrid}>
             {activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:activeDefects.length>14?3:activeDefects.length>8?6:10}]}>
-              <Text numberOfLines={2} style={[styles.capturePreviewDefect,{fontSize:activeDefects.length>14?10:activeDefects.length>8?12:14}]}>{d.label}</Text>
+              <Text style={[styles.capturePreviewDefect,{fontSize:activeDefects.length>14?10:activeDefects.length>8?12:14}]}>{d.label}</Text>
               <Text style={styles.capturePreviewCount}>{counts[d.key]}</Text>
               <Text style={styles.capturePreviewPercent}>{totalPreview>0?(n(counts[d.key]||'0')/totalPreview*100).toFixed(1):'—'}%</Text>
             </View>)}
@@ -531,7 +533,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
       const total=n(frutos);
       const counted=defects.reduce((s,d)=>s+n(counts[d.key]||'0'),0);
       const score=kind==='anden'&&total>0?scoreAnden(Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')])),total,n(larvas)):null;
-      const summary=['Rancho: '+rancho,'Frutos inspeccionados: '+total,'Defectos contados: '+counted,kind==='anden'?'Embaladora: '+(embaladora||'Sin especificar'):'Taras: '+taras+' (3 kg c/u)',kind==='anden'?'Resultado: '+(score?.disposicion||'Pendiente'):'Empacable manual: '+(empacable||'Sin capturar')+'%'].join('\n');
+      const summary=['Rancho: '+rancho,'Sector: '+(sector||'—'),'Variedad: '+variedad+' · '+presentacion,'Cuadrilla: '+(cuadrilla||'—'),'Evaluador: '+profile.display_name,'Frutos inspeccionados: '+total,'Defectos contados: '+counted,kind==='anden'?'Embaladora: '+(embaladora||'Sin especificar'):'Taras: '+taras+' (3 kg c/u)',kind==='anden'?'Resultado: '+(score?.disposicion||'Pendiente'):'Empacable manual: '+(empacable||'Sin capturar')+'%'].join('\n');
       Alert.alert('Confirmar muestreo',summary+'\n\n¿Confirmas guardar este registro?',[
         {text:'Revisar',style:'cancel'},
         {text:editing?'Guardar cambios':'Confirmar y guardar',onPress:()=>{void save();}}
