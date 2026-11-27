@@ -44,12 +44,12 @@ with check (created_by = (select auth.uid()) and role = 'trabajador'
 and used_by is null and public.cb_is_admin());
 -- El canje es atómico y comprueba la invitación sin exponer su lectura.
 create or replace function public.cb_redeem_invitation(
-  p_code text, p_display_name text, p_puesto text
+  p_code text, p_name text, p_puesto text
 ) returns boolean language plpgsql security definer
 set search_path = '' as $$
 declare v_inv public.cb_invitations%rowtype; v_email text;
 begin
-  if auth.uid() is null or length(trim(p_display_name)) < 3 then return false; end if;
+  if auth.uid() is null or length(trim(p_name)) < 3 then return false; end if;
   select email into v_email from auth.users where id = auth.uid();
   if v_email is null then return false; end if;
   select * into v_inv from public.cb_invitations
@@ -58,7 +58,7 @@ begin
   if not found then return false; end if;
   if exists (select 1 from public.cb_profiles where user_id = auth.uid()) then return false; end if;
   insert into public.cb_profiles(user_id,email,display_name,puesto,role)
-    values(auth.uid(),v_email,trim(p_display_name),trim(p_puesto),'trabajador');
+    values(auth.uid(),v_email,trim(p_name),trim(p_puesto),'trabajador');
   update public.cb_invitations set used_by = auth.uid() where code = v_inv.code;
   return true;
 end;
