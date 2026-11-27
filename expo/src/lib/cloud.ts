@@ -39,7 +39,7 @@ export async function redeemPendingInvitation(email: string) {
   const pending = await getPending();
   if (!pending || pending.email !== email.toLowerCase()) return false;
   const { data, error } = await supabase.rpc('cb_redeem_invitation', {
-    p_code: pending.code, p_name: pending.name, p_puesto: pending.puesto,
+    p_code: pending.code, p_display_name: pending.name, p_puesto: pending.puesto,
   });
   if (error) throw error;
   if (data === true) await clearPending();
