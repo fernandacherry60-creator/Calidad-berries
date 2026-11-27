@@ -31,4 +31,4 @@ jobs:
       - name: Comprobar Expo config y EAS projectId
         run: |
           npx expo config --type public
-          npx expo config --json | node -e "let s='';process.stdin.on('data',x=>s+=x);process.stdin.on('end',()=>{const c=JSON.parse(s);if(c.extra?.eas?.projectId!=='5a29290a-a0bb-41a2-8441-a6f19dd75b70')process.exit(1)})"
+          npx expo config --json | node -e "let s='';process.stdin.on('data',x=>s+=x);process.stdin.on('end',()=>{const c=JSON.parse(s);if(c.extra?.eas?.projectId!=='4ced7997-9a09-4962-b3d5-222d923b0287')process.exit(1)})"
