@@ -107,25 +107,30 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
   let uploaded = 0;
   try {
     const connection = await db();
-    const rows = await connection.getAllAsync<LocalSample>(
-      'SELECT * FROM samples WHERE owner_id=? AND synced=0 ORDER BY fecha ASC LIMIT 100',[user.id]);
-    for (const row of rows) {
-      // owner_id, nombre y correo nunca proceden de entradas editables.
-      const payload = JSON.parse(row.payload) as Record<string, unknown>;
-      const sanitized = {
-        ...payload, owner_id: user.id, usuario_email: profile.email,
-        usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
-      };
-      const { error } = await supabase.from(row.table_name).insert(sanitized);
-      if (error) {
-        if (error.code !== '23505') throw error;
-        // Confirmar existencia de la muestra bajo RLS antes de marcarla enviada.
-        const check = await supabase.from(row.table_name).select('uuid')
-          .eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
-        if (check.error || !check.data) continue;
+    while (true) {
+      const rows = await connection.getAllAsync<LocalSample>(
+        'SELECT * FROM samples WHERE owner_id=? AND synced=0 ORDER BY fecha ASC LIMIT 100',[user.id]);
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        // owner_id, nombre y correo nunca proceden de entradas editables.
+        const payload = JSON.parse(row.payload) as Record<string, unknown>;
+        const sanitized = {
+          ...payload, owner_id: user.id, usuario_email: profile.email,
+          usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
+        };
+        const { error } = await supabase.from(row.table_name).insert(sanitized);
+        if (error) {
+          if (error.code !== '23505') throw error;
+          // Si la petición anterior llegó al servidor pero se perdió la respuesta,
+          // confirmar el UUID bajo RLS antes de marcarlo como sincronizado.
+          const check = await supabase.from(row.table_name).select('uuid')
+            .eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
+          if (check.error) throw check.error;
+          if (!check.data) throw new Error('No se pudo confirmar un registro duplicado: '+row.uuid);
+        }
+        await connection.runAsync('UPDATE samples SET synced=1 WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
+        uploaded++;
       }
-      await connection.runAsync('UPDATE samples SET synced=1 WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
-      uploaded++;
     }
   } finally { syncing = false; }
   return { uploaded, pending: await pendingCount(profile.user_id) };
