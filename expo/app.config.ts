@@ -7,7 +7,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'QUALYX',
   icon: './assets/QUALYX-logo-v2.png',
-  slug: 'klunder-tropi',
+  slug: 'fernanda-1',
   owner: 'fer-cherrys-team',
   scheme: 'calidadberriespro',
   version: '1.0.0',
