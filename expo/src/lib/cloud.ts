@@ -3,9 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://zcwtlremnqkptjzlnpao.supabase.co';
-const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_ZaOo-I-NZo-Gx8UeT_k4Qg_GLFNEJhT';
-if (!key) console.warn('Configura EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const key = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+if (!url || !key) {
+  throw new Error(
+    'Falta configurar EXPO_PUBLIC_SUPABASE_URL y EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY en el entorno de Expo.',
+  );
+}
 
 const storage = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
