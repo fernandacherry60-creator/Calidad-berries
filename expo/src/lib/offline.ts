@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import * as SecureStore from 'expo-secure-store';
+import NetInfo from '@react-native-community/netinfo';
 import { supabase, type Profile } from './cloud';
 
 export type TableName = 'muestreos_anden' | 'muestreos_proceso' | 'semaforo';
@@ -34,6 +35,16 @@ export async function getCachedProfile(userId: string): Promise<Profile | null> 
   if (!raw) return null;
   const profile = JSON.parse(raw) as Profile;
   return profile.user_id === userId && profile.active ? profile : null;
+}
+export async function getAnyCachedProfile(): Promise<Profile | null> {
+  try {
+    const raw = await SecureStore.getItemAsync('verified_profile');
+    if (!raw) return null;
+    const profile = JSON.parse(raw) as Profile;
+    return profile?.user_id && profile.active && profile.email ? profile : null;
+  } catch {
+    return null;
+  }
 }
 export async function clearCachedProfile() {
   await SecureStore.deleteItemAsync('verified_profile');
@@ -86,32 +97,40 @@ export async function localSamples(ownerId: string): Promise<LocalSample[]> {
 }
 let syncing = false;
 export async function syncSamples(profile: Profile): Promise<{ uploaded: number; pending: number }> {
+  const network = await NetInfo.fetch();
+  if (!network.isConnected || network.isInternetReachable === false) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
   if (syncing) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError) throw userError;
   if (!user || user.id !== profile.user_id || !profile.active) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
   syncing = true;
   let uploaded = 0;
   try {
     const connection = await db();
-    const rows = await connection.getAllAsync<LocalSample>(
-      'SELECT * FROM samples WHERE owner_id=? AND synced=0 ORDER BY fecha ASC LIMIT 100',[user.id]);
-    for (const row of rows) {
-      // owner_id, nombre y correo nunca proceden de entradas editables.
-      const payload = JSON.parse(row.payload) as Record<string, unknown>;
-      const sanitized = {
-        ...payload, owner_id: user.id, usuario_email: profile.email,
-        usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
-      };
-      const { error } = await supabase.from(row.table_name).insert(sanitized);
-      if (error) {
-        if (error.code !== '23505') continue;
-        // Confirmar existencia de la muestra bajo RLS antes de marcarla enviada.
-        const check = await supabase.from(row.table_name).select('uuid')
-          .eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
-        if (check.error || !check.data) continue;
+    while (true) {
+      const rows = await connection.getAllAsync<LocalSample>(
+        'SELECT * FROM samples WHERE owner_id=? AND synced=0 ORDER BY fecha ASC LIMIT 100',[user.id]);
+      if (rows.length === 0) break;
+      for (const row of rows) {
+        // owner_id, nombre y correo nunca proceden de entradas editables.
+        const payload = JSON.parse(row.payload) as Record<string, unknown>;
+        const sanitized = {
+          ...payload, owner_id: user.id, usuario_email: profile.email,
+          usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
+        };
+        const { error } = await supabase.from(row.table_name).insert(sanitized);
+        if (error) {
+          if (error.code !== '23505') throw error;
+          // Si la petición anterior llegó al servidor pero se perdió la respuesta,
+          // confirmar el UUID bajo RLS antes de marcarlo como sincronizado.
+          const check = await supabase.from(row.table_name).select('uuid')
+            .eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
+          if (check.error) throw check.error;
+          if (!check.data) throw new Error('No se pudo confirmar un registro duplicado: '+row.uuid);
+        }
+        await connection.runAsync('UPDATE samples SET synced=1 WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
+        uploaded++;
       }
-      await connection.runAsync('UPDATE samples SET synced=1 WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
-      uploaded++;
     }
   } finally { syncing = false; }
   return { uploaded, pending: await pendingCount(profile.user_id) };

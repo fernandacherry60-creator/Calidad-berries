@@ -4,7 +4,7 @@ import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase, loadProfile, redeemPendingInvitation, type Profile } from './src/lib/cloud';
-import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
+import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, getAnyCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
 type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo'|'cultivos'|'calculadora'|'pesos'|'ayuda'|'informes';
@@ -65,27 +65,62 @@ export default function App() {
   const [editing,setEditing]=useState<LocalSample|null>(null);
   const [panel,setPanel]=useState<'admin'|'worker'>('admin');
   const [pending,setPending]=useState(0);
+  const [isOnline,setIsOnline]=useState(true);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
+  useEffect(()=>{
+    let alive=true;
+    NetInfo.fetch().then(state=>{if(alive)setIsOnline(!!state.isConnected&&state.isInternetReachable!==false);}).catch(()=>{if(alive)setIsOnline(false);});
+    const unsubscribe=NetInfo.addEventListener(state=>setIsOnline(!!state.isConnected&&state.isInternetReachable!==false));
+    return ()=>{alive=false;unsubscribe();};
+  },[]);
   const refresh=useCallback(async()=>{
-    const {data:{session}}=await withDeadline(supabase.auth.getSession(),5000);
+    let cached:Profile|null=null;
+    try { cached=await getAnyCachedProfile(); } catch { cached=null; }
+    let session=null;
+    try {
+      const result=await withDeadline(supabase.auth.getSession(),5000);
+      session=result.data.session;
+    } catch (error) {
+      if(cached?.active){
+        setUserId(cached.user_id);setProfile(cached);
+        void pendingCount(cached.user_id).then(setPending).catch(()=>{});
+        return;
+      }
+      throw error;
+    }
     const user=session?.user;
-    if(!user){setUserId(null);setProfile(null);return;}
+    if(!user){
+      if(cached?.active){
+        setUserId(cached.user_id);setProfile(cached);
+        void pendingCount(cached.user_id).then(setPending).catch(()=>{});
+      }else{setUserId(null);setProfile(null);}
+      return;
+    }
     setUserId(user.id);
-    const cached=await getCachedProfile(user.id);
-    if(cached){setProfile(cached);setBusy(false);}
+    const userCached=await getCachedProfile(user.id);
+    if(userCached){setProfile(userCached);setBusy(false);}
     let p:Profile|null=null;
     try {
       const {data:validated,error:authError}=await withDeadline(supabase.auth.getUser(),5000);
       if(authError){
-        if(authError.status===401||authError.status===403){await clearCachedProfile();setProfile(null);setUserId(null);return;}
+        if(authError.status===401||authError.status===403){
+          await clearCachedProfile();setProfile(null);setUserId(null);return;
+        }
         throw authError;
       }
-      if(!validated.user||validated.user.id!==user.id){await clearCachedProfile();setProfile(null);setUserId(null);return;}
+      if(!validated.user||validated.user.id!==user.id){
+        await clearCachedProfile();setProfile(null);setUserId(null);return;
+      }
       p=await withDeadline(loadProfile(user.id),5000);
-      if(!p&&user.email){await withDeadline(redeemPendingInvitation(user.email),5000);p=await withDeadline(loadProfile(user.id),5000);}
+      if(!p&&user.email){
+        await withDeadline(redeemPendingInvitation(user.email),5000);
+        p=await withDeadline(loadProfile(user.id),5000);
+      }
       if(p?.active)await cacheVerifiedProfile(p);
       else await clearCachedProfile();
-    }catch(e){p=cached;}
+    }catch(error){
+      p=userCached?.active?userCached:(cached?.user_id===user.id?cached:null);
+    }
     setProfile(p?.active?p:null);
     if(p?.active)void pendingCount(p.user_id).then(setPending).catch(()=>{});
   },[]);
@@ -132,6 +167,7 @@ export default function App() {
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
   return <View style={styles.page}>
     <View style={styles.top}><Text style={styles.topTitle}>QUALYX</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
+    <View style={{paddingHorizontal:16,paddingVertical:8,backgroundColor:isOnline?'#E6F4E9':'#FFF0DC'}}><Text style={{fontSize:12,fontWeight:'700',color:isOnline?'#17663B':'#8A4B12'}}>{isOnline?(pending>0?'En línea · '+pending+' pendiente(s) por sincronizar':'En línea · sincronización disponible'):'Sin internet · los muestreos se guardan en este teléfono y se enviarán al reconectar'}</Text></View>
     <ScrollView contentContainerStyle={styles.body}>
       {screen!=='home'&&<Pressable onPress={()=>navigate('home')}><Text style={styles.back}>‹ Volver al inicio</Text></Pressable>}
       {screen==='cultivos'&&<><Text style={styles.heading}>QUALYX · Cultivos</Text><Text style={styles.subtitle}>Selecciona el cultivo a muestrear</Text><Button title="🍓 Frambuesa · disponible" onPress={()=>navigate('home')}/></>}
