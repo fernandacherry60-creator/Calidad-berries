@@ -2,7 +2,7 @@ name: Expo Calidad Berries Pro - validación
 on:
   workflow_dispatch:
   push:
-    branches: [main, feature/paneles-admin-trabajador-20261117]
+    branches: [main, feature/paneles-admin-trabajador-20261117, fix/offline-sync-three-step-flow]
     paths:
       - 'expo/**'
       - '.github/workflows/calidad-berries-expo.yml'
