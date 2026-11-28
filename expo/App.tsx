@@ -9,7 +9,7 @@ import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase, loadProfile, redeemPendingInvitation, type Profile } from './src/lib/cloud';
-import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, getAnyCachedProfile, clearCachedProfile, cacheCatalogs, getCachedCatalogs, type TableName, type LocalSample } from './src/lib/offline';
+import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, getAnyCachedProfile, clearCachedProfile, cacheCatalogs, getCachedCatalogs, cacheRemoteSample, localTeamSamples, cacheTeamProfiles, getCachedTeamProfiles, type TableName, type LocalSample } from './src/lib/offline';
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
 type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'cultivos'|'calculadora'|'pesos'|'informes'|'catalogos';
@@ -324,18 +324,30 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
   const [workerName,setWorkerName]=useState('');
   const [workerPuesto,setWorkerPuesto]=useState(puestos[0]);
   const [loading,setLoading]=useState(false);
+  const [offlineMode,setOfflineMode]=useState(false);
   const refresh=useCallback(async()=>{
     try{
       const {data,error}=await supabase.from('cb_profiles').select('*').order('display_name');
-      if(error)throw error;setMembers((data||[]) as Profile[]);
+      if(error)throw error;
+      const team=(data||[]) as Profile[];
+      setMembers(team);await cacheTeamProfiles(team);
       const all:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso'] as TableName[]){
         const result=await supabase.from(table).select('*').order('fecha',{ascending:false}).limit(50);
         if(result.error)throw result.error;
-        all.push(...(result.data||[]).map(item=>({...item,tipo:table})));
+        const records=(result.data||[]) as Record<string,unknown>[];
+        for(const record of records)await cacheRemoteSample(table,record);
+        all.push(...records.map(item=>({...item,tipo:table})));
       }
-      all.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));setSamples(all);
-    }catch(e){Alert.alert('Consulta',errorMessage(e));}
+      all.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));setSamples(all);setOfflineMode(false);
+    }catch(e){
+      const [cachedMembers,cachedRows]=await Promise.all([getCachedTeamProfiles(),localTeamSamples()]);
+      if(cachedMembers.length)setMembers(cachedMembers);
+      if(cachedRows.length){
+        setSamples(cachedRows.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tipo:row.table_name,_localRow:row})).filter(row=>row.tipo==='muestreos_anden'||row.tipo==='muestreos_proceso'));
+        setOfflineMode(true);
+      }else Alert.alert('Consulta',errorMessage(e));
+    }
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
   async function invite(){
@@ -356,8 +368,9 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
     {invitation!==""&&<Text style={styles.notice}>Invitación enviada a {invitation}</Text>}
     <Text style={styles.section}>Personal ({members.length})</Text>
     {members.map(m=><View key={m.user_id} style={styles.card}><Text style={styles.label}>{m.display_name} · {m.role}</Text><Text>{m.email} · {m.puesto} · {m.active?'Activo':'Inactivo'}</Text></View>)}
-    <Text style={styles.section}>Últimos muestreos en la nube</Text>
-    {samples.map(m=>{const isAnden=m.tipo==='muestreos_anden';const disposition=String(m.disposicion||'');const statusColor=disposition==='RECHAZO'?C.danger:disposition==='REEMPAQUE'?'#A66B00':'#16803C';const statusBg=disposition==='RECHAZO'?'#FCE4E4':disposition==='REEMPAQUE'?'#FFF3D6':'#E5F3E8';return <View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{isAnden?'Andenes':'Fruta proceso'} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text>{isAnden?<Text style={{fontWeight:'900',color:statusColor,backgroundColor:statusBg,padding:8,borderRadius:8,marginVertical:5}}>{disposition}</Text>:<Text>Empacable {Number(m.potencial_empacable||0).toFixed(1)}%</Text>}<Button title="Modificar este muestreo" onPress={()=>onEdit({uuid:String(m.uuid),owner_id:String(m.owner_id),table_name:m.tipo as TableName,payload:JSON.stringify(m),fecha:String(m.fecha),synced:1})}/></View>;})}
+    <Text style={styles.section}>{offlineMode?'Últimos muestreos guardados en este teléfono':'Últimos muestreos en la nube'}</Text>
+    {offlineMode&&<Text style={styles.notice}>Sin conexión. Puedes abrir y modificar registros descargados anteriormente; los cambios quedarán pendientes hasta recuperar internet.</Text>}
+    {samples.map(m=>{const isAnden=m.tipo==='muestreos_anden';const disposition=String(m.disposicion||'');const statusColor=disposition==='RECHAZO'?C.danger:disposition==='REEMPAQUE'?'#A66B00':'#16803C';const statusBg=disposition==='RECHAZO'?'#FCE4E4':disposition==='REEMPAQUE'?'#FFF3D6':'#E5F3E8';return <View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{isAnden?'Andenes':'Fruta proceso'} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text>{isAnden?<Text style={{fontWeight:'900',color:statusColor,backgroundColor:statusBg,padding:8,borderRadius:8,marginVertical:5}}>{disposition}</Text>:<Text>Empacable {Number(m.potencial_empacable||0).toFixed(1)}%</Text>}<Button title="Modificar este muestreo" onPress={()=>onEdit((m._localRow as LocalSample|undefined)||{uuid:String(m.uuid),owner_id:String(m.owner_id),table_name:m.tipo as TableName,payload:JSON.stringify(m),fecha:String(m.fecha),synced:1})}/></View>;})}
   </>;
 }
 function CatalogsView(){
@@ -384,7 +397,7 @@ function CalculatorView(){
   return <><Text style={styles.heading}>Calculadora de defectos</Text><Text style={styles.subtitle}>Simulación Driscoll's · mismos criterios que Andenes · no guarda registros</Text>
     <View style={{flexDirection:'row',gap:10}}><View style={{flex:1}}><Input label="Frutos totales" value={total} onChange={setTotal} keyboard="numeric"/></View><View style={{flex:1}}><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></View></View>
     {['condicion','apariencia'].map(group=><><Text style={styles.section}>{group==='condicion'?'Condición · límite 5%':'Apariencia · reempaque 15–15.5%, rechazo desde 15.6%'}</Text>
-      {andenDefects.filter(d=>d.category===group).map(d=><View key={d.key} style={styles.defectRow}><View style={{flex:1}}><Text style={styles.defectTitle}>{d.label}</Text><Text style={styles.defectCategory}>{sample>0?(values[d.key]/sample*100).toFixed(1)+'%':'—'}</Text></View><Pressable accessibilityLabel={'Restar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(Math.max(0,n(prev[d.key]||'0')-1))}))} style={styles.counterButton}><Text style={styles.counterText}>−</Text></Pressable><Text style={styles.counterValue}>{counts[d.key]||'0'}</Text><Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable></View>)}
+      <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:7}}>{andenDefects.filter(d=>d.category===group).map(d=><View key={d.key} style={[styles.defectRow,{width:'48%',flexGrow:1,flexBasis:'47%',marginBottom:0,paddingVertical:8}]}><View style={{flex:1}}><Text style={styles.defectTitle}>{d.label}</Text><Text style={styles.defectCategory}>{sample>0?(values[d.key]/sample*100).toFixed(1)+'%':'—'}</Text></View><Pressable accessibilityLabel={'Restar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(Math.max(0,n(prev[d.key]||'0')-1))}))} style={styles.counterButton}><Text style={styles.counterText}>−</Text></Pressable><Text style={styles.counterValue}>{counts[d.key]||'0'}</Text><Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable></View>)}
     </>)}
     <View style={styles.card}><Text style={styles.label}>Frutos contados: {counted} / {sample||0}</Text>{!valid&&<Text style={{color:C.danger}}>Revisa los conteos: deben ser enteros y no superar el total de frutos.</Text>}
       {result&&<><Text style={[styles.big,{color:result.disposicion==='RECHAZO'?C.danger:result.disposicion==='REEMPAQUE'?C.gold:'#16803C'}]}>{result.disposicion}</Text><Text>Condición: {(result.pct_condicion*100).toFixed(1)}% · Apariencia: {(result.pct_apariencia*100).toFixed(1)}%</Text><Text>Puntos: {result.puntos_total}/80 · Larvas: {larva}</Text></>}
@@ -408,17 +421,29 @@ function ReportsView(){
   const load=async()=>{
     setLoading(true);
     try{
-      const days=period==='Hoy'?1:period==='7 días'?7:30;
-      const from=new Date();from.setHours(0,0,0,0);from.setDate(from.getDate()-(days-1));
+      const now=new Date();
+      const from=new Date(now);from.setHours(0,0,0,0);
+      let until:Date|null=null;
+      if(period==='7 días')from.setDate(from.getDate()-6);
+      else if(period==='Mes actual')from.setDate(1);
+      else if(period==='Mes anterior'){
+        from.setDate(1);from.setMonth(from.getMonth()-1);
+        until=new Date(from);until.setMonth(until.getMonth()+1);
+      }else if(period==='30 días')from.setDate(from.getDate()-29);
       const results:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso'] as const){
-        // Ambas tablas no comparten todas las columnas.
-        const columns='*';
-        let q=supabase.from(table).select(columns).gte('fecha',from.toISOString()).order('fecha',{ascending:false}).limit(500);
-        if(rancho!=='Todos')q=q.eq('rancho',rancho);
-        const {data,error}=await q;
-        if(error)throw error;
-        results.push(...((data||[]) as unknown as Record<string,unknown>[]).map(x=>({...x,tabla:table})));
+        let offset=0;
+        while(true){
+          let q=supabase.from(table).select('*').gte('fecha',from.toISOString()).order('fecha',{ascending:false}).range(offset,offset+999);
+          if(until)q=q.lt('fecha',until.toISOString());
+          if(rancho!=='Todos')q=q.eq('rancho',rancho);
+          const {data,error}=await q;
+          if(error)throw error;
+          const page=(data||[]) as unknown as Record<string,unknown>[];
+          results.push(...page.map(x=>({...x,tabla:table})));
+          if(page.length<1000)break;
+          offset+=1000;
+        }
       }
       setRows(results);
     }catch(e){Alert.alert('Informes',errorMessage(e));}finally{setLoading(false);}
@@ -449,7 +474,7 @@ function ReportsView(){
   const trend=Object.entries(daily).sort((a,b)=>a[0].localeCompare(b[0]));
   const maxDaily=Math.max(1,...trend.map(x=>x[1]));
   return <><Text style={styles.heading}>Informes de calidad</Text>
-    <Choice label="Periodo" options={['Hoy','7 días','30 días']} value={period} onChange={setPeriod}/>
+    <Choice label="Periodo" options={['Hoy','7 días','Mes actual','Mes anterior','30 días']} value={period} onChange={setPeriod}/>
     <Choice label="Rancho" options={['Todos',...ranchOptions]} value={rancho} onChange={setRancho}/>
     <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/><Button title={exporting?'Preparando Excel…':'Exportar Excel · 3 hojas'} disabled={exporting||rows.length===0} onPress={()=>void exportExcel()}/>
     <Text style={styles.section}>Andenes</Text>
@@ -595,13 +620,13 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
       {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Input label="Licencia" value={licencia} onChange={setLicencia}/><Input label="Evaluador" value={evaluador} onChange={setEvaluador}/><Input label="Grados Brix" value={brix} onChange={setBrix} keyboard="numeric"/><Choice label="Variedad" options={catalogOptions.variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
       {kind==='proceso'?<><View style={{padding:12,backgroundColor:'#FFF4DD',borderRadius:10,marginBottom:12}}><Text style={{fontWeight:'800',color:C.ink,marginBottom:8}}>Indicador de porcentaje de proceso</Text><View style={{gap:7}}><Text style={{fontSize:12,color:'#16803C',fontWeight:'800'}}>● VERDE · ÓPTIMO · hasta 5%</Text><Text style={{fontSize:12,color:'#BD8A30',fontWeight:'800'}}>● AMARILLO · PRECAUCIÓN · más de 5% y menos de 10%</Text><Text style={{fontSize:12,color:C.danger,fontWeight:'800'}}>● ROJO · ALTO · 10% o más</Text></View></View><Button title="Siguiente · Formato de muestreo" onPress={()=>setStep(2)}/></>:<><Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric"/>{kind==='anden'&&<><Input label="Canastos muestreados · editable" value={canastos||String(canastosPorCajas(n(cajas)))} onChange={setCanastos} keyboard="numeric"/><Text style={styles.notice}>Sugerencia automática: {canastosPorCajas(n(cajas))} canasto(s) · puedes ajustar este valor manualmente.</Text></>}<Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric"/><Button title="Siguiente · Formato de muestreo" onPress={()=>{if(!Number.isInteger(n(frutos))||n(frutos)<=0||n(cajas)<0||n(taras)<0){Alert.alert('Revisar datos','Comprueba las cantidades');return;}setStep(2);}}/></>}</>}
       {step===2&&<>{kind==='proceso'&&<><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion} compact/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla} compact/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora} compact/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric" compact/><Input label="Frutos con larvas" value={larvas} onChange={setLarvas} keyboard="numeric" compact/><Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric" compact/><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric" compact/><Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric" compact/><View style={{padding:10,backgroundColor:'#FFF4DD',borderRadius:10,marginBottom:10}}><Text style={{fontWeight:'700',color:processColor(liveProcess)}}>Porcentaje de proceso: {liveProcess===null?'—':liveProcess.toFixed(1)+'%'} · {processLabel(liveProcess)}</Text></View><Input label="Porcentaje empacable (%) · captura obligatoria" value={empacable} onChange={setEmpacable} keyboard="numeric" compact/></>}<Text style={styles.label}>Frutos: {frutos} · Embaladora: {embaladora||'—'}</Text><Text style={styles.section}>Defectos encontrados</Text>
-      {defects.map(d=><View key={d.key} style={styles.defectRow}>
+      <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:7}}>{defects.map(d=><View key={d.key} style={[styles.defectRow,{width:'48%',flexGrow:1,flexBasis:'47%',marginBottom:0,paddingVertical:8}]}>
           <View style={{flex:1}}><Text style={styles.defectTitle}>{d.label}</Text><Text style={styles.defectCategory}>{d.category}</Text></View>
           <Pressable accessibilityLabel={'Restar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(Math.max(0,n(prev[d.key]||'0')-1))}))} style={styles.counterButton}><Text style={styles.counterText}>−</Text></Pressable>
           <Text style={styles.counterValue}>{counts[d.key]||'0'}</Text>
           <Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable>
-        </View>)}
-      {kind==='anden'&&<><Input label="Observaciones" value={nota} onChange={setNota}/><Text style={styles.section}>Evidencia fotográfica</Text><Button title="Tomar fotografía" onPress={async()=>{try{const permission=await ImagePicker.requestCameraPermissionsAsync();if(!permission.granted)throw new Error('Autoriza el acceso a la cámara para adjuntar evidencia.');const shot=await ImagePicker.launchCameraAsync({quality:0.75,allowsEditing:false});if(shot.canceled||!shot.assets?.[0]?.uri)return;const folder=(FileSystem.documentDirectory||'')+'evidencias/';await FileSystem.makeDirectoryAsync(folder,{intermediates:true});const target=folder+Crypto.randomUUID()+'.jpg';await FileSystem.copyAsync({from:shot.assets[0].uri,to:target});setPhotos(prev=>[...prev,target]);}catch(e){Alert.alert('Fotografía',errorMessage(e));}}}/><Button title="Elegir desde galería" onPress={async()=>{try{const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();if(!permission.granted)throw new Error('Autoriza el acceso a tus fotos para adjuntar evidencia.');const selection=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:0.75,selectionLimit:10});if(selection.canceled||!selection.assets?.length)return;const folder=(FileSystem.documentDirectory||'')+'evidencias/';await FileSystem.makeDirectoryAsync(folder,{intermediates:true});const copied:string[]=[];for(const asset of selection.assets){if(!asset.uri)continue;const extension=(asset.fileName?.split('.').pop()||'jpg').toLowerCase();const target=folder+Crypto.randomUUID()+'.'+(extension.match(/^(jpg|jpeg|png|webp)$/)?extension:'jpg');await FileSystem.copyAsync({from:asset.uri,to:target});copied.push(target);}setPhotos(prev=>[...prev,...copied]);}catch(e){Alert.alert('Galería',errorMessage(e));}}}/><Text style={styles.notice}>{photos.length+storedPhotoPaths.length} fotografía(s) adjunta(s). Se guardan localmente y se suben al recuperar conexión.</Text>{photos.map((uri,index)=><View key={uri} style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:8}}><Image source={{uri}} style={{width:64,height:64,borderRadius:8}}/><Text style={{flex:1}}>Evidencia {index+1}</Text><Button title="Quitar" onPress={()=>setPhotos(prev=>prev.filter(x=>x!==uri))}/></View>)}</>}
+        </View>)}</View>
+      {kind==='anden'&&<><Input label="Observaciones" value={nota} onChange={setNota}/><Text style={styles.section}>Evidencia fotográfica</Text><Button title="Tomar fotografía" onPress={async()=>{try{const permission=await ImagePicker.requestCameraPermissionsAsync();if(!permission.granted)throw new Error('Autoriza el acceso a la cámara para adjuntar evidencia.');const shot=await ImagePicker.launchCameraAsync({quality:0.75,allowsEditing:false});if(shot.canceled||!shot.assets?.[0]?.uri)return;const folder=(FileSystem.documentDirectory||'')+'evidencias/';await FileSystem.makeDirectoryAsync(folder,{intermediates:true});const target=folder+Crypto.randomUUID()+'.jpg';await FileSystem.copyAsync({from:shot.assets[0].uri,to:target});setPhotos(prev=>[...prev,target]);}catch(e){Alert.alert('Fotografía',errorMessage(e));}}}/><Button title="Elegir desde galería" onPress={async()=>{try{const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();if(!permission.granted)throw new Error('Autoriza el acceso a tus fotos para adjuntar evidencia.');const selection=await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],allowsMultipleSelection:true,quality:0.75,selectionLimit:10});if(selection.canceled||!selection.assets?.length)return;const folder=(FileSystem.documentDirectory||'')+'evidencias/';await FileSystem.makeDirectoryAsync(folder,{intermediates:true});const copied:string[]=[];for(const asset of selection.assets){if(!asset.uri)continue;const sourceExtension=(asset.fileName?.split('.').pop()||'').toLowerCase();const mimeExtension=asset.mimeType==='image/png'?'png':asset.mimeType==='image/webp'?'webp':asset.mimeType==='image/heic'?'heic':asset.mimeType==='image/heif'?'heif':asset.mimeType==='image/jpeg'?'jpg':'';const extension=(mimeExtension||sourceExtension).replace('jpeg','jpg');if(!/^(jpg|png|webp|heic|heif)$/.test(extension))throw new Error('Formato de imagen no compatible. Selecciona JPG, PNG, WEBP o HEIC.');const target=folder+Crypto.randomUUID()+'.'+extension;await FileSystem.copyAsync({from:asset.uri,to:target});copied.push(target);}setPhotos(prev=>[...prev,...copied]);}catch(e){Alert.alert('Galería',errorMessage(e));}}}/><Text style={styles.notice}>{photos.length+storedPhotoPaths.length} fotografía(s) adjunta(s). Se guardan localmente y se suben al recuperar conexión.</Text>{photos.map((uri,index)=><View key={uri} style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:8}}><Image source={{uri}} style={{width:64,height:64,borderRadius:8}}/><Text style={{flex:1}}>Evidencia {index+1}</Text><Button title="Quitar" onPress={()=>setPhotos(prev=>prev.filter(x=>x!==uri))}/></View>)}</>}
        <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}if(kind==='proceso'&&(!empacable.trim()||!Number.isFinite(n(empacable))||n(empacable)<0||n(empacable)>100)){Alert.alert('Dato obligatorio','Captura el porcentaje empacable entre 0 y 100 antes de continuar.');return;}setStep(3);}}/></>}
        {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.capturePreviewSheet}>
          <Text style={styles.capturePreviewTitle}>{kind==='anden'?'MUESTREO DE ANDÉN':'MUESTREO DE PROCESO'}</Text>
@@ -646,7 +671,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
       const total=n(frutos);
       const counted=defects.reduce((s,d)=>s+n(counts[d.key]||'0'),0);
       const score=kind==='anden'&&total>0?scoreAnden(Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')])),total,n(larvas)):null;
-      const summary=['Rancho: '+rancho,'Sector: '+(sector||'—'),'Variedad: '+variedad+' · '+presentacion,'Cuadrilla: '+(cuadrilla||'—'),'Evaluador: '+profile.display_name,'Frutos inspeccionados: '+total,'Defectos contados: '+counted,kind==='anden'?'Embaladora: '+(embaladora||'Sin especificar'):'Taras: '+taras+' (3 kg c/u)',kind==='anden'?'Resultado: '+(score?.disposicion||'Pendiente'):'Empacable manual: '+(empacable||'Sin capturar')+'%'].join('\n');
+      const summary=['Rancho: '+rancho,'Sector: '+(sector||'—'),'Variedad: '+variedad+' · '+presentacion,'Cuadrilla: '+(cuadrilla||'—'),'Evaluador: '+evaluador.trim(),'Frutos inspeccionados: '+total,'Defectos contados: '+counted,kind==='anden'?'Embaladora: '+(embaladora||'Sin especificar'):'Taras: '+taras+' (3 kg c/u)',kind==='anden'?'Resultado: '+(score?.disposicion||'Pendiente'):'Empacable manual: '+(empacable||'Sin capturar')+'%'].join('\n');
       Alert.alert('Confirmar muestreo',summary+'\n\n¿Confirmas guardar este registro?',[
         {text:'Revisar',style:'cancel'},
         {text:editing?'Guardar cambios':'Confirmar y guardar',onPress:()=>{void save();}}
