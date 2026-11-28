@@ -1,0 +1,34 @@
+name: Recuperar Android Preview compatible con runtime 1.0.0
+on:
+  push:
+    branches: [rollback-preview-android-runtime-1.0.0]
+    paths:
+      - 'expo/**'
+      - '.github/workflows/rollback-preview-android.yml'
+concurrency:
+  group: eas-update-preview-android
+  cancel-in-progress: true
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: expo
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: expo/package-lock.json
+      - run: npm install
+      - run: npx tsc --noEmit
+      - run: npm run test:parity
+      - run: npm install --global eas-cli
+      - name: Publish compatible Android rollback
+        run: eas update --branch preview --platform android --message "QUALYX Android: restauración compatible runtime 1.0.0" --non-interactive
