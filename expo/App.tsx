@@ -109,7 +109,7 @@ export default function App() {
     } catch (error) {
       if(cached?.active){
         setUserId(cached.user_id);setProfile(cached);
-        void pendingCount(cached.user_id).then(setPending).catch(()=>{});
+        void pendingCount(cached.user_id,cached.role==='admin').then(setPending).catch(()=>{});
         return;
       }
       throw error;
@@ -118,7 +118,7 @@ export default function App() {
     if(!user){
       if(cached?.active){
         setUserId(cached.user_id);setProfile(cached);
-        void pendingCount(cached.user_id).then(setPending).catch(()=>{});
+        void pendingCount(cached.user_id,cached.role==='admin').then(setPending).catch(()=>{});
       }else{setUserId(null);setProfile(null);}
       return;
     }
@@ -148,7 +148,7 @@ export default function App() {
       p=userCached?.active?userCached:(cached?.user_id===user.id?cached:null);
     }
     setProfile(p?.active?p:null);
-    if(p?.active)void pendingCount(p.user_id).then(setPending).catch(()=>{});
+    if(p?.active)void pendingCount(p.user_id,p.role==='admin').then(setPending).catch(()=>{});
   },[]);
   useEffect(()=>{
     let alive=true;
@@ -171,7 +171,7 @@ export default function App() {
           const {data}=await supabase.from('cb_app_config').select('value').eq('key','features').maybeSingle();
           if(active&&data?.value)setFeatures(data.value as Record<string,boolean>);
         }
-        if(active)setPending(await pendingCount(profile.user_id));
+        if(active)setPending(await pendingCount(profile.user_id,profile.role==='admin'));
       }catch(e){console.warn('Sincronización pendiente',errorMessage(e));}
     };
     void sync();
@@ -227,7 +227,7 @@ export default function App() {
       {screen==='informes'&&adminPanel&&<ReportsView/>}
       {screen==='catalogos'&&adminPanel&&<CatalogsView/>}
       {screen==='history'&&<HistoryView profile={profile} onEdit={openEdit}/>}
-      {(screen==='anden'||screen==='proceso')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
+      {(screen==='anden'||screen==='proceso')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id,profile.role==='admin'));navigate('home');}}/>}
     </ScrollView>
   </View>;
 }
