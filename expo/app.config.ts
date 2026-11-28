@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   android: { package: 'com.klunder.calidadberriespro', versionCode: 2, adaptiveIcon: { foregroundImage: './assets/QUALYX-logo-v2.png', backgroundColor: '#FFF9F3' } },
   ios: { bundleIdentifier: 'com.klunder.calidadberriespro', supportsTablet: true },
-  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-updates', ['expo-image-picker', { cameraPermission: 'Permitir que QUALYX tome fotografías como evidencia de los muestreos.', photosPermission: 'Permitir que QUALYX adjunte fotografías de evidencia.' }]],
+  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-updates', ['expo-image-picker', { cameraPermission: 'Permitir que QUALYX tome fotografías como evidencia de los muestreos.', photosPermission: 'Permitir que QUALYX adjunte fotografías de evidencia de calidad.' }]],
   runtimeVersion: { policy: 'appVersion' },
   updates: {
     url: `https://u.expo.dev/${easProjectId}`,
