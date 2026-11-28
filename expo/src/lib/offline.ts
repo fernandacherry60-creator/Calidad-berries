@@ -4,7 +4,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { supabase, type Profile } from './cloud';
 
 export type TableName = 'muestreos_anden' | 'muestreos_proceso' | 'semaforo';
-export type LocalSample = { uuid: string; owner_id: string; table_name: TableName; payload: string; fecha: string; synced: number };
+export type LocalSample = { uuid: string; owner_id: string; table_name: TableName; payload: string; fecha: string; synced: number; operation?: 'insert'|'update' };
 export type PendingInvite = { email: string; code: string; name: string; puesto: string };
 let dbPromise: ReturnType<typeof initializeDatabase> | null = null;
 async function initializeDatabase() {
