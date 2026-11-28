@@ -1,4 +1,4 @@
-name: Publicar actualización OTA a Expo Preview
+name: Publicar actualización OTA Android a Expo Preview
 on:
   push:
     branches: [main, fix/cambios-clienta-muestreo-andenes]
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: eas-update-preview
+  group: eas-update-preview-android
   cancel-in-progress: true
 
 jobs:
@@ -45,6 +45,6 @@ jobs:
         run: npx tsc --noEmit
       - name: Install EAS CLI
         run: npm install --global eas-cli
-      - name: Publish preview OTA update
+      - name: Publish Android preview OTA update
         run: >-
-          eas update --branch preview --message "QUALYX: ajustes de muestreo, reglas de calidad y retiro de módulos" --non-interactive
+          eas update --branch preview --platform android --message "QUALYX Android: ajustes de muestreo, reglas de calidad y retiro de módulos" --non-interactive
