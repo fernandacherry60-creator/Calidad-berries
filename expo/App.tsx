@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Updates from 'expo-updates';
 import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
@@ -69,6 +70,24 @@ export default function App() {
   const [pending,setPending]=useState(0);
   const [isOnline,setIsOnline]=useState(true);
   const [features,setFeatures]=useState<Record<string,boolean>>({enable_sampling:true,enable_semaforo:true,enable_cloud_sync:true});
+  // Aplicar automáticamente las OTA pendientes al iniciar Android Preview.
+  // La publicación está filtrada a Android desde GitHub Actions.
+  useEffect(()=>{
+    if(Platform.OS!=='android'||__DEV__||!Updates.isEnabled)return;
+    let cancelled=false;
+    const applyAvailableUpdate=async()=>{
+      try{
+        const result=await Updates.checkForUpdateAsync();
+        if(!result.isAvailable||cancelled)return;
+        await Updates.fetchUpdateAsync();
+        if(!cancelled)await Updates.reloadAsync();
+      }catch(error){
+        console.warn('Actualización OTA Android',errorMessage(error));
+      }
+    };
+    void applyAvailableUpdate();
+    return ()=>{cancelled=true;};
+  },[]);
   useEffect(()=>{
     let alive=true;
     NetInfo.fetch().then(state=>{if(alive)setIsOnline(!!state.isConnected&&state.isInternetReachable!==false);}).catch(()=>{if(alive)setIsOnline(false);});
