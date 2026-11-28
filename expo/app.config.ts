@@ -15,8 +15,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   android: { package: 'com.klunder.calidadberriespro', versionCode: 2, adaptiveIcon: { foregroundImage: './assets/QUALYX-logo-v2.png', backgroundColor: '#FFF9F3' } },
   ios: { bundleIdentifier: 'com.klunder.calidadberriespro', supportsTablet: true },
-  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-updates', 'expo-image-picker'],
-  runtimeVersion: { policy: 'appVersion' },
+  plugins: ['expo-secure-store', 'expo-sqlite', 'expo-updates'],
+  runtimeVersion: '1.0.0',
   updates: {
     url: `https://u.expo.dev/${easProjectId}`,
     checkAutomatically: 'ON_LOAD',
