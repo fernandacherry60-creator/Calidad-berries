@@ -1,7 +1,7 @@
 name: Publicar actualización OTA a Expo Preview
 on:
   push:
-    branches: [main]
+    branches: [main, fix/cambios-clienta-muestreo-andenes]
     paths:
       - 'expo/**'
       - '.github/workflows/eas-update.yml'
@@ -46,4 +46,4 @@ jobs:
       - name: Install EAS CLI
         run: npm install --global eas-cli
       - name: Publish preview OTA update
-        run: eas update --branch preview --message "Calidad Berries Pro: diseño rojo y dorado, módulos de calidad" --non-interactive
+        run: eas update --branch preview --message "QUALYX: ajustes de muestreo, reglas de calidad y retiro de módulos" --non-interactive
