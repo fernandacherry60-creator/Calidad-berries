@@ -7,7 +7,7 @@ import { supabase, loadProfile, redeemPendingInvitation, type Profile } from './
 import { savePending, saveSample, updatePendingSample, updateSyncedSample, syncSamples, localSamples, pendingCount, cacheVerifiedProfile, getCachedProfile, getAnyCachedProfile, clearCachedProfile, type TableName, type LocalSample } from './src/lib/offline';
 import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, variedades, presentaciones, puestos, canastosPorCajas } from './src/lib/rules';
 
-type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo'|'cultivos'|'calculadora'|'pesos'|'ayuda'|'informes';
+type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'cultivos'|'calculadora'|'pesos'|'informes';
 const C = { ink:'#502027', green:'#A52A35', cream:'#FFF9F3', muted:'#80636A', line:'#E8CBA3', white:'#FFFFFF', danger:'#B71C32', gold:'#BD8A30', burgundy:'#651B2B' };
 const fieldStyle = { borderWidth:1,borderColor:C.line,borderRadius:10,padding:9,backgroundColor:C.white,fontSize:14,color:C.ink,fontStyle:'italic' } as const;
 const processColor = (pct:number|null) => pct===null?'#80636A':pct<=5?'#16803C':pct<10?'#BD8A30':C.danger;
@@ -167,7 +167,7 @@ export default function App() {
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
   const navigate=(next:Screen)=>{
     if(!adminPanel&&(next==='team'||next==='informes')){Alert.alert('Acceso restringido','Esta sección está disponible únicamente para administración.');return;}
-    if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);
+    if(next==='anden'||next==='proceso')setEditing(null);
     setScreen(next);
   };
   const openEdit=(row:LocalSample)=>{setEditing(row);setScreen(row.table_name==='muestreos_anden'?'anden':'proceso');};
@@ -193,17 +193,14 @@ export default function App() {
         
         <ModuleTile icon="🧮" title="Calculadora de defectos" description="Porcentajes de la muestra sin guardar" onPress={()=>navigate('calculadora')}/>
         <ModuleTile icon="⚖️" title="Pesos de clamshells" description="Verificar rangos por presentación" onPress={()=>navigate('pesos')}/>
-        <ModuleTile icon="📖" title="Ayuda visual" description="Criterios de calidad y defectos" onPress={()=>navigate('ayuda')}/>
         <ModuleTile icon="🕘" title="Mi historial de este teléfono" description="Consultar y editar tus muestreos guardados" onPress={()=>navigate('history')}/>
         <Pressable onPress={logout}><Text style={styles.logout}>Cerrar sesión</Text></Pressable>
       </>}
       {screen==='team'&&adminPanel&&<TeamView onEdit={openEdit}/>}
       {screen==='calculadora'&&<CalculatorView/>}
       {screen==='pesos'&&<WeightsView/>}
-      {screen==='ayuda'&&<HelpView/>}
       {screen==='informes'&&adminPanel&&<ReportsView/>}
       {screen==='history'&&<HistoryView profile={profile} onEdit={openEdit}/>}
-      {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
   </View>;
 }
@@ -354,13 +351,6 @@ function WeightsView(){
     {presentaciones.map(p=><View key={p.name} style={styles.card}><Text style={styles.label}>{p.name}</Text>
       <Text>Rango: {p.min}–{p.max} g</Text><Text style={{color:Number.isFinite(value)?value>=p.min&&value<=p.max?C.green:C.danger:C.muted}}>{Number.isFinite(value)?value>=p.min&&value<=p.max?'Dentro de rango':'Fuera de rango':'Ingresa un peso'}</Text></View>)}</>;
 }
-function HelpView(){
-  return <><Text style={styles.heading}>Ayuda visual de calidad</Text><Text style={styles.subtitle}>Criterios de referencia; consulta el protocolo de la empresa antes de determinar una disposición.</Text>
-    <Text style={styles.section}>Condición y apariencia · Andenes</Text>
-    {andenDefects.map(d=><View key={d.key} style={styles.card}><Text style={styles.label}>{d.label}</Text><Text>{d.category==='condicion'?'Condición':'Apariencia'}</Text>{d.key==='Excreta de pajaro'&&<Text style={{color:C.danger}}>Un fruto implica rechazo automático</Text>}</View>)}
-    <Text style={styles.section}>Defectos de fruta proceso</Text>
-    {procesoDefects.map(d=><View key={d.key} style={styles.card}><Text style={styles.label}>{d.label}</Text><Text>{d.category}</Text></View>)}</>;
-}
 function ReportsView(){
   const [period,setPeriod]=useState('Hoy');
   const [rancho,setRancho]=useState('Todos');
@@ -428,7 +418,7 @@ function HistoryView({profile,onEdit}:{profile:Profile;onEdit:(row:LocalSample)=
   return <><Text style={styles.heading}>Historial local</Text>{rows.length===0&&<Text>Sin registros en este teléfono</Text>}
     {rows.map(row=><View key={row.uuid} style={styles.card}><Text style={styles.label}>{row.table_name}</Text><Text>{row.fecha}</Text><Text style={{color:row.synced?C.green:C.danger}}>{row.synced?'Sincronizado':'Pendiente'}</Text>{row.table_name!=='semaforo'&&<Button title="Modificar muestreo" onPress={()=>onEdit(row)}/>}</View>)}</>;
 }
-function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'semaforo';profile:Profile;onSaved:()=>Promise<void>;editing:LocalSample|null}){
+function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';profile:Profile;onSaved:()=>Promise<void>;editing:LocalSample|null}){
   const [rancho,setRancho]=useState(ranchos[0]),[sector,setSector]=useState(''),[variedad,setVariedad]=useState(variedades[0]);
   const [presentacion,setPresentacion]=useState('6 oz'),[cuadrilla,setCuadrilla]=useState('');
   const [cajas,setCajas]=useState('0'),[taras,setTaras]=useState('0'),[frutos,setFrutos]=useState('100');
@@ -466,7 +456,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
     setSaving(true);
     try{
       const total=n(frutos),box=n(cajas),t=n(taras),larva=n(larvas);
-      if(kind!=='semaforo'&&(!Number.isInteger(total)||total<=0||!Number.isInteger(box)||box<0))throw new Error('Revisa los totales de frutos y cajas');
+      if(!Number.isInteger(total)||total<=0||!Number.isInteger(box)||box<0)throw new Error('Revisa los totales de frutos y cajas');
       if(!nonNegative(t)||!Number.isInteger(t)||!nonNegative(larva)||!Number.isInteger(larva))throw new Error('Los conteos deben ser enteros positivos');
       const defectCounts:Record<string,number>={};
       for(const d of defects){
@@ -493,9 +483,6 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         const score=scoreProceso(defectCounts,total,box,t,manual);
         payload={uuid,fecha,cultivo:'Frambuesa',frutos_muestra:total,rancho,presentacion,cuadrilla,muestreados:embaladora,peso:peso?n(peso):null,frutos_larva:larva,cajas:box,taras:t,...score,...identity(profile)};
         table='muestreos_proceso';
-      }else{
-        payload={uuid,fecha,cultivo:'Frambuesa',categoria,nivel,nota,...identity(profile)};
-        table='semaforo';
       }
       if(editing){
         // Preservar la identidad y la fecha originales para evitar duplicados.
@@ -517,9 +504,8 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
       }else await onSaved();
     }catch(e){Alert.alert('Revisar captura',errorMessage(e));}finally{setSaving(false);}
   }
-  return <><Text style={styles.heading}>{editing?'Modificar muestreo':kind==='anden'?'Muestreo de andén':kind==='proceso'?'Muestreo de proceso':'Semáforo'}</Text>
+  return <><Text style={styles.heading}>{editing?'Modificar muestreo':kind==='anden'?'Muestreo de andén':'Muestreo de proceso'}</Text>
     <Text style={styles.subtitle}>Frambuesa · captura segura sin conexión</Text>
-    {kind==='semaforo'?<><Input label="Categoría" value={categoria} onChange={setCategoria}/><Choice label="Nivel" options={['ok','warn','danger']} value={nivel} onChange={setNivel}/><Input label="Observaciones" value={nota} onChange={setNota}/></>:<>
       <Text style={styles.section}>Paso {step} de 3 · {step===1?'Datos generales':step===2?'Formato de muestreo':'Resultado final'}</Text>
       {step===1&&<><Choice label="Rancho" options={ranchos} value={rancho} onChange={setRancho}/>
       {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Choice label="Variedad" options={variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
@@ -547,7 +533,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
        </View></>}
     </>}
     {step===3&&kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
-      {step===3&&kind!=='semaforo'&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
+      {step===3&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
     <Modal visible={sharePreview} animationType="slide" onRequestClose={()=>setSharePreview(false)}>
       <View style={styles.capturePreviewPage}>
         <View style={styles.capturePreviewTop}><Text style={styles.capturePreviewBrand}>QUALYX · {kind==='anden'?'ANDENES':'FRUTA PROCESO'}</Text><Pressable onPress={()=>setSharePreview(false)} accessibilityLabel="Cerrar resumen"><Text style={styles.capturePreviewClose}>✕</Text></Pressable></View>
@@ -572,7 +558,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
         <Text style={styles.capturePreviewHint}>Vista compacta para captura de pantalla. Si el contenido supera la altura del teléfono, usa una captura con desplazamiento.</Text>
       </View>
     </Modal></>}
-    {(step===3||kind==='semaforo')&&<Button title={saving?'Guardando…':editing?'Revisar modificaciones':'Revisar y confirmar muestreo'} disabled={saving} onPress={()=>{
+    {step===3&&<Button title={saving?'Guardando…':editing?'Revisar modificaciones':'Revisar y confirmar muestreo'} disabled={saving} onPress={()=>{
       const total=n(frutos);
       const counted=defects.reduce((s,d)=>s+n(counts[d.key]||'0'),0);
       const score=kind==='anden'&&total>0?scoreAnden(Object.fromEntries(defects.map(d=>[d.key,n(counts[d.key]||'0')])),total,n(larvas)):null;
