@@ -135,10 +135,10 @@ let syncing = false;
 export async function syncSamples(profile: Profile): Promise<{ uploaded: number; pending: number }> {
   const network = await NetInfo.fetch();
   if (!network.isConnected || network.isInternetReachable === false) return { uploaded: 0, pending: await pendingCount(profile.user_id,profile.role==='admin') };
-  if (syncing) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
+  if (syncing) return { uploaded: 0, pending: await pendingCount(profile.user_id,profile.role==='admin') };
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
-  if (!user || user.id !== profile.user_id || !profile.active) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
+  if (!user || user.id !== profile.user_id || !profile.active) return { uploaded: 0, pending: await pendingCount(profile.user_id,profile.role==='admin') };
   syncing = true;
   let uploaded = 0;
   try {
@@ -159,7 +159,7 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
           const base64=await FileSystem.readAsStringAsync(uri,{encoding:FileSystem.EncodingType.Base64});
           if(!base64)throw new Error('No se pudo leer una fotografía guardada en el teléfono.');
           const extension=uri.split('?')[0].split('.').pop()?.toLowerCase()||'jpg';
-          const mime=extension==='png'?'image/png':extension==='webp'?'image/webp':extension==='heic'?'image/heic':'image/jpeg';
+          const mime=extension==='png'?'image/png':extension==='webp'?'image/webp':extension==='heic'?'image/heic':extension==='heif'?'image/heif':'image/jpeg';
           const normalizedExtension=extension==='jpeg'?'jpg':extension;
           const path=user.id+'/'+row.uuid+'/'+i+'.'+normalizedExtension;
           const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,decode(base64),{contentType:mime,upsert:true});
