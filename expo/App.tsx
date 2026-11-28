@@ -425,6 +425,11 @@ function ReportsView(){
   };
   const anden=rows.filter(r=>r.tabla==='muestreos_anden'),proceso=rows.filter(r=>r.tabla==='muestreos_proceso');
   const rejected=anden.filter(r=>r.disposicion==='RECHAZO').length;
+  const reempaques=anden.filter(r=>r.disposicion==='REEMPAQUE'||r.disposicion==='PRE-RECHAZO').length;
+  const rejectionRate=anden.length?rejected/anden.length*100:0;
+  const rejectionColor=rejectionRate>15?C.danger:rejectionRate>5?'#BD8A30':'#16803C';
+  const andenDaily=Object.entries(anden.reduce((acc,r)=>{const day=String(r.fecha||'').slice(0,10);if(!acc[day])acc[day]={paso:0,reempaque:0,rechazo:0};if(r.disposicion==='RECHAZO')acc[day].rechazo++;else if(r.disposicion==='REEMPAQUE'||r.disposicion==='PRE-RECHAZO')acc[day].reempaque++;else acc[day].paso++;return acc;},{} as Record<string,{paso:number;reempaque:number;rechazo:number}>)).sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxAndenDaily=Math.max(1,...andenDaily.map(([,v])=>v.paso+v.reempaque+v.rechazo));
   const avg=proceso.length?proceso.reduce((s,r)=>s+Number(r.potencial_empacable||0),0)/proceso.length:0;
   const defectTotals:Record<string,number>={};
   for(const r of rows){
@@ -446,8 +451,18 @@ function ReportsView(){
     <Choice label="Periodo" options={['Hoy','7 días','30 días']} value={period} onChange={setPeriod}/>
     <Choice label="Rancho" options={['Todos',...ranchOptions]} value={rancho} onChange={setRancho}/>
     <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/><Button title={exporting?'Preparando Excel…':'Exportar Excel · 3 hojas'} disabled={exporting||rows.length===0} onPress={()=>void exportExcel()}/>
-    <View style={styles.card}><Text style={styles.label}>Andenes: {anden.length} · Rechazos: {rejected}</Text>
-      <Text style={styles.label}>Proceso: {proceso.length} · Potencial empacable promedio: {avg.toFixed(1)}%</Text></View>
+    <Text style={styles.section}>Andenes</Text>
+    <View style={{flexDirection:'row',gap:7,marginBottom:12}}>
+      <View style={[styles.card,{flex:1,marginBottom:0,padding:10,borderLeftColor:C.green}]}><Text style={{fontSize:11,color:C.muted,fontWeight:'700'}}>TARIMAS</Text><Text style={{fontSize:23,fontWeight:'900',color:C.ink}}>{anden.length}</Text></View>
+      <View style={[styles.card,{flex:1,marginBottom:0,padding:10,borderLeftColor:rejectionColor}]}><Text style={{fontSize:11,color:C.muted,fontWeight:'700'}}>RECHAZO</Text><Text style={{fontSize:23,fontWeight:'900',color:rejectionColor}}>{rejectionRate.toFixed(0)}%</Text></View>
+      <View style={[styles.card,{flex:1,marginBottom:0,padding:10,borderLeftColor:'#BD8A30'}]}><Text style={{fontSize:11,color:C.muted,fontWeight:'700'}}>REEMPAQUE</Text><Text style={{fontSize:23,fontWeight:'900',color:'#A66B00'}}>{reempaques}</Text></View>
+    </View>
+    {andenDaily.length===0?<Text style={styles.notice}>Sin muestreos de andén para este periodo.</Text>:<View style={styles.card}>
+      <Text style={styles.label}>Tarimas por día según disposición</Text>
+      {andenDaily.map(([day,v])=>{const total=v.paso+v.reempaque+v.rechazo;return <View key={day} style={{marginBottom:12}}><Text style={{fontSize:12,color:C.ink,marginBottom:5}}>{day} · {total} tarimas</Text><View style={{height:16,backgroundColor:'#EEE8E1',borderRadius:8,overflow:'hidden',flexDirection:'row'}}>{v.paso>0&&<View style={{width:(v.paso/maxAndenDaily*100)+'%',backgroundColor:'#16803C'}}/>}{v.reempaque>0&&<View style={{width:(v.reempaque/maxAndenDaily*100)+'%',backgroundColor:'#BD8A30'}}/>}{v.rechazo>0&&<View style={{width:(v.rechazo/maxAndenDaily*100)+'%',backgroundColor:C.danger}}/>}</View><Text style={{fontSize:11,color:C.muted,marginTop:3}}>Paso {v.paso} · Reempaque {v.reempaque} · Rechazo {v.rechazo}</Text></View>;})}
+      <View style={{flexDirection:'row',flexWrap:'wrap',gap:12}}><Text style={{fontSize:11,color:'#16803C',fontWeight:'800'}}>● PASO</Text><Text style={{fontSize:11,color:'#A66B00',fontWeight:'800'}}>● REEMPAQUE</Text><Text style={{fontSize:11,color:C.danger,fontWeight:'800'}}>● RECHAZO</Text></View>
+    </View>}
+    <View style={styles.card}><Text style={styles.label}>Fruta proceso: {proceso.length} · Potencial empacable promedio: {avg.toFixed(1)}%</Text></View>
     <Text style={styles.section}>Gráfica de defectos más frecuentes</Text>
     {topDefects.length===0&&<Text style={styles.notice}>No hay defectos registrados para el filtro seleccionado.</Text>}
     {topDefects.map(([label,value])=><View key={label} style={{marginBottom:12}}>
