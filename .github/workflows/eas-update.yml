@@ -43,6 +43,8 @@ jobs:
         run: npm install
       - name: Validate TypeScript
         run: npx tsc --noEmit
+      - name: Compare Flutter and Expo scoring fixtures
+        run: npm run test:parity
       - name: Install EAS CLI
         run: npm install --global eas-cli
       - name: Publish Android preview OTA update
