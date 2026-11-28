@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '22'
       - name: Instalar dependencias con lockfile
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
       - name: Verificar TypeScript
         run: npx tsc --noEmit
       - name: Comprobar Expo Doctor
