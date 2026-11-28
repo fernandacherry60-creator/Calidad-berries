@@ -1,8 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
-import * as FileSystem from 'expo-file-system/legacy';
-import { decode } from 'base64-arraybuffer';
 import { supabase, type Profile } from './cloud';
 
 export type TableName = 'muestreos_anden' | 'muestreos_proceso' | 'semaforo';
@@ -129,21 +127,9 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
       for (const row of rows) {
         // owner_id, nombre y correo nunca proceden de entradas editables.
         const payload = JSON.parse(row.payload) as Record<string, unknown>;
-        const localPhotos=Array.isArray(payload.fotos_locales)?payload.fotos_locales.filter((v):v is string=>typeof v==='string'):[];
-        const storedPhotos=Array.isArray(payload.fotos_json)?payload.fotos_json.filter((v):v is string=>typeof v==='string'):[];
-        const uploadedPhotos:string[]=[];
-        for(let i=0;i<localPhotos.length;i++){
-          const uri=localPhotos[i];
-          const base64=await FileSystem.readAsStringAsync(uri,{encoding:FileSystem.EncodingType.Base64});
-          if(!base64)throw new Error('No se pudo leer una fotografía guardada en el teléfono.');
-          const path=user.id+'/'+row.uuid+'/'+i+'.jpg';
-          const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,decode(base64),{contentType:'image/jpeg',upsert:true});
-          if(photoError)throw photoError;
-          uploadedPhotos.push(path);
-        }
         const {fotos_locales:_localPhotos,...basePayload}=payload;
         const sanitized = {
-          ...basePayload, uuid:row.uuid, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: user.id, usuario_email: profile.email,
+          ...basePayload, uuid:row.uuid, owner_id: user.id, usuario_email: profile.email,
           usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
         };
         if(row.operation==='update'){
