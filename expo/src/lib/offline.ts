@@ -1,6 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 import * as SecureStore from 'expo-secure-store';
 import NetInfo from '@react-native-community/netinfo';
+import * as FileSystem from 'expo-file-system/legacy';
+import { decode } from 'base64-arraybuffer';
 import { supabase, type Profile } from './cloud';
 
 export type TableName = 'muestreos_anden' | 'muestreos_proceso' | 'semaforo';
@@ -132,11 +134,10 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
         const uploadedPhotos:string[]=[];
         for(let i=0;i<localPhotos.length;i++){
           const uri=localPhotos[i];
-          const response=await fetch(uri);
-          if(!response.ok)throw new Error('No se pudo leer una fotografía guardada en el teléfono.');
-          const blob=await response.blob();
+          const base64=await FileSystem.readAsStringAsync(uri,{encoding:FileSystem.EncodingType.Base64});
+          if(!base64)throw new Error('No se pudo leer una fotografía guardada en el teléfono.');
           const path=user.id+'/'+row.uuid+'/'+i+'.jpg';
-          const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});
+          const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,decode(base64),{contentType:'image/jpeg',upsert:true});
           if(photoError)throw photoError;
           uploadedPhotos.push(path);
         }
