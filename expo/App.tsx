@@ -201,6 +201,7 @@ export default function App() {
       {screen==='pesos'&&<WeightsView/>}
       {screen==='informes'&&adminPanel&&<ReportsView/>}
       {screen==='history'&&<HistoryView profile={profile} onEdit={openEdit}/>}
+      {(screen==='anden'||screen==='proceso')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
   </View>;
 }
