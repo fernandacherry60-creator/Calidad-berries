@@ -161,10 +161,14 @@ export default function App() {
   if(busy)return <View style={styles.center}><Image source={require("./assets/QUALYX-logo-v2.png")} style={{width:270,height:270}} resizeMode="contain" accessibilityLabel="QUALYX Control de Calidad Berries"/><ActivityIndicator color={C.green} size="large"/></View>;
   if(recovering)return <ResetPasswordView onComplete={async()=>{setRecovering(false);await supabase.auth.signOut();await refresh();}}/>;
   if(!userId||!profile)return <AuthView userId={userId} onDone={refresh} onLogout={logout} onPanel={setPanel}/>;
-  const navigate=(next:Screen)=>{if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);setScreen(next);};
-  const openEdit=(row:LocalSample)=>{setEditing(row);setScreen(row.table_name==='muestreos_anden'?'anden':'proceso');};
   const dualPanel=profile.role==='admin'&&profile.email.toLowerCase()==='yamilethklunder@gmail.com';
   const adminPanel=profile.role==='admin'&&(!dualPanel||panel==='admin');
+  const navigate=(next:Screen)=>{
+    if(!adminPanel&&(next==='team'||next==='informes')){Alert.alert('Acceso restringido','Esta sección está disponible únicamente para administración.');return;}
+    if(next==='anden'||next==='proceso'||next==='semaforo')setEditing(null);
+    setScreen(next);
+  };
+  const openEdit=(row:LocalSample)=>{setEditing(row);setScreen(row.table_name==='muestreos_anden'?'anden':'proceso');};
   return <View style={styles.page}>
     <View style={styles.top}><Text style={styles.topTitle}>QUALYX</Text><Text style={styles.topSmall}>{profile.display_name} · {adminPanel?'Administradora':'Trabajadora'}</Text></View>
     <View style={{paddingHorizontal:16,paddingVertical:8,backgroundColor:isOnline?'#E6F4E9':'#FFF0DC'}}><Text style={{fontSize:12,fontWeight:'700',color:isOnline?'#17663B':'#8A4B12'}}>{isOnline?(pending>0?'En línea · '+pending+' pendiente(s) por sincronizar':'En línea · sincronización disponible'):'Sin internet · los muestreos se guardan en este teléfono y se enviarán al reconectar'}</Text></View>
@@ -172,26 +176,30 @@ export default function App() {
       {screen!=='home'&&<Pressable onPress={()=>navigate('home')}><Text style={styles.back}>‹ Volver al inicio</Text></Pressable>}
       {screen==='cultivos'&&<><Text style={styles.heading}>QUALYX · Cultivos</Text><Text style={styles.subtitle}>Selecciona el cultivo a muestrear</Text><Button title="🍓 Frambuesa · disponible" onPress={()=>navigate('home')}/></>}
       {screen==='home'&&<>
-        {dualPanel&&<Choice label="Panel de trabajo" options={['Administradora','Trabajadora']} value={panel==='admin'?'Administradora':'Trabajadora'} onChange={v=>setPanel(v==='Administradora'?'admin':'worker')}/>}
-        <Text style={styles.heading}>Módulos · Frambuesa</Text>
-        <Text style={styles.subtitle}>Captura offline y sincronización segura con Supabase</Text>
+        {dualPanel&&<Choice label="Vista de trabajo" options={['Administradora','Trabajadora']} value={panel==='admin'?'Administradora':'Trabajadora'} onChange={v=>{setPanel(v==='Administradora'?'admin':'worker');setScreen('home');}}/>}
+        <Text style={styles.heading}>{adminPanel?'Panel de administración':'Panel de trabajador'}</Text>
+        <Text style={styles.subtitle}>{adminPanel?'Supervisa personal, muestreos y resultados de calidad':'Captura tus muestreos y consulta tus registros'}</Text>
         <View style={styles.card}><Text style={styles.label}>Registros pendientes en este teléfono</Text><Text style={styles.big}>{pending}</Text>
           <Button title="Sincronizar ahora" onPress={async()=>{try{const r=await syncSamples(profile);setPending(r.pending);Alert.alert('Sincronización',`Subidos: ${r.uploaded}. Pendientes: ${r.pending}`);}catch(e){Alert.alert('Sin conexión',errorMessage(e));}}}/></View>
+        {adminPanel&&<>
+          <Text style={styles.section}>Administración y supervisión</Text>
+          <ModuleTile icon="👥" title="Trabajadores y muestreos en la nube" description="Gestionar personal y consultar registros sincronizados" onPress={()=>navigate('team')}/>
+          <ModuleTile icon="📊" title="Informes de calidad" description="Consultar resultados y estadísticas de calidad" onPress={()=>navigate('informes')}/>
+        </>}
+        <Text style={styles.section}>{adminPanel?'Herramientas de muestreo':'Captura de calidad'}</Text>
         {features.enable_sampling!==false&&<><ModuleTile icon="🚚" title="Andenes" description="Recepción, condición, apariencia y disposición" onPress={()=>navigate('anden')}/><ModuleTile icon="⚗️" title="Fruta proceso" description="Defectos, áreas de enfoque y porcentaje de proceso" onPress={()=>navigate('proceso')}/></>}
         {features.enable_semaforo!==false&&<ModuleTile icon="🚦" title="Semáforo" description="Registrar nivel de calidad" onPress={()=>navigate('semaforo')}/>}
         <ModuleTile icon="🧮" title="Calculadora de defectos" description="Porcentajes de la muestra sin guardar" onPress={()=>navigate('calculadora')}/>
         <ModuleTile icon="⚖️" title="Pesos de clamshells" description="Verificar rangos por presentación" onPress={()=>navigate('pesos')}/>
         <ModuleTile icon="📖" title="Ayuda visual" description="Criterios de calidad y defectos" onPress={()=>navigate('ayuda')}/>
-        <ModuleTile icon="📊" title="Informes de calidad" description="Reportes, estadísticas y gráficas de muestreos" onPress={()=>navigate('informes')}/>
-        <ModuleTile icon="🕘" title="Historial de este teléfono" description="Consultar y editar muestreos guardados" onPress={()=>navigate('history')}/>
-        {adminPanel&&<ModuleTile icon="☁️" title="Trabajadores y muestreos en la nube" description="Administrar personal y registros sincronizados" onPress={()=>navigate('team')}/>}
+        <ModuleTile icon="🕘" title="Mi historial de este teléfono" description="Consultar y editar tus muestreos guardados" onPress={()=>navigate('history')}/>
         <Pressable onPress={logout}><Text style={styles.logout}>Cerrar sesión</Text></Pressable>
       </>}
       {screen==='team'&&adminPanel&&<TeamView onEdit={openEdit}/>}
       {screen==='calculadora'&&<CalculatorView/>}
       {screen==='pesos'&&<WeightsView/>}
       {screen==='ayuda'&&<HelpView/>}
-      {screen==='informes'&&<ReportsView/>}
+      {screen==='informes'&&adminPanel&&<ReportsView/>}
       {screen==='history'&&<HistoryView profile={profile} onEdit={openEdit}/>}
       {(screen==='anden'||screen==='proceso'||screen==='semaforo')&&<CaptureView kind={screen} profile={profile} editing={editing} onSaved={async()=>{setEditing(null);setPending(await pendingCount(profile.user_id));navigate('home');}}/>}
     </ScrollView>
