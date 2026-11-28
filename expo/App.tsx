@@ -359,6 +359,19 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
     {samples.map(m=><View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{String(m.tipo)} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text>{m.tipo!=='semaforo'&&<Button title="Modificar este muestreo" onPress={()=>onEdit({uuid:String(m.uuid),owner_id:String(m.owner_id),table_name:m.tipo as TableName,payload:JSON.stringify(m),fecha:String(m.fecha),synced:1})}/>}</View>)}
   </>;
 }
+function CatalogsView(){
+  const [ranchosList,setRanchosList]=useState(ranchos),[variedadesList,setVariedadesList]=useState(variedades);
+  const [newRancho,setNewRancho]=useState(''),[newVariedad,setNewVariedad]='';
+  const [loading,setLoading]=useState(false);
+  useEffect(()=>{let active=true;(async()=>{try{const {data,error}=await supabase.from('cb_catalogs').select('ranchos,variedades').eq('id',1).maybeSingle();if(error)throw error;if(active&&data){setRanchosList(data.ranchos||ranchos);setVariedadesList(data.variedades||variedades);}}catch(e){Alert.alert('Catálogos',errorMessage(e));}})();return()=>{active=false;};},[]);
+  const save=async(nextRanchos:string[],nextVariedades:string[])=>{setLoading(true);try{const {data,error}=await supabase.from('cb_catalogs').update({ranchos:nextRanchos,variedades:nextVariedades,updated_at:new Date().toISOString()}).eq('id',1).select('id').maybeSingle();if(error)throw error;if(!data)throw new Error('No se guardaron los cambios. Verifica que tu perfil tenga permisos de administración.');const next={ranchos:nextRanchos,variedades:nextVariedades};await cacheCatalogs(next);setRanchosList(nextRanchos);setVariedadesList(nextVariedades);Alert.alert('Catálogos','Cambios guardados. Los teléfonos los descargarán al conectarse.');}catch(e){Alert.alert('No se pudo guardar',errorMessage(e));}finally{setLoading(false);}};
+  return <><Text style={styles.heading}>Administración de catálogos</Text><Text style={styles.subtitle}>Los cambios se sincronizan con los teléfonos del equipo.</Text>
+    <Text style={styles.section}>Ranchos ({ranchosList.length})</Text><Input label="Agregar rancho" value={newRancho} onChange={setNewRancho}/><Button title="Agregar rancho" disabled={loading||newRancho.trim().length<2||ranchosList.some(x=>x.toLowerCase()===newRancho.trim().toLowerCase())} onPress={()=>{const next=[...ranchosList,newRancho.trim().toUpperCase()];setNewRancho('');void save(next,variedadesList);}}/>
+    {ranchosList.map(item=><View key={item} style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:10,backgroundColor:C.white,borderRadius:10,marginBottom:6}}><Text style={{color:C.ink,flex:1}}>{item}</Text><Button title="Eliminar" disabled={loading||ranchosList.length<=1} onPress={()=>void save(ranchosList.filter(x=>x!==item),variedadesList)}/></View>)}
+    <Text style={styles.section}>Variedades ({variedadesList.length})</Text><Input label="Agregar variedad" value={newVariedad} onChange={setNewVariedad}/><Button title="Agregar variedad" disabled={loading||newVariedad.trim().length<2||variedadesList.some(x=>x.toLowerCase()===newVariedad.trim().toLowerCase())} onPress={()=>{const next=[...variedadesList,newVariedad.trim().toUpperCase()];setNewVariedad('');void save(ranchosList,next);}}/>
+    {variedadesList.map(item=><View key={item} style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',padding:10,backgroundColor:C.white,borderRadius:10,marginBottom:6}}><Text style={{color:C.ink,flex:1}}>{item}</Text><Button title="Eliminar" disabled={loading||variedadesList.length<=1} onPress={()=>void save(ranchosList,variedadesList.filter(x=>x!==item))}/></View>)}
+  </>;
+}
 function CalculatorView(){
   const [total,setTotal]=useState('100'),[larvas,setLarvas]=useState('0');
   const [counts,setCounts]=useState<Record<string,string>>({});
@@ -388,7 +401,7 @@ function ReportsView(){
   const [period,setPeriod]=useState('Hoy');
   const [rancho,setRancho]=useState('Todos');
   const [rows,setRows]=useState<Record<string,unknown>[]>([]);
-  const [loading,setLoading]=useState(false);
+  const [loading,setLoading]=useState(false),[exporting,setExporting]=useState(false);
   const load=async()=>{
     setLoading(true);
     try{
