@@ -400,6 +400,8 @@ function WeightsView(){
 function ReportsView(){
   const [period,setPeriod]=useState('Hoy');
   const [rancho,setRancho]=useState('Todos');
+  const [ranchOptions,setRanchOptions]=useState(ranchos);
+  useEffect(()=>{let active=true;(async()=>{const cached=await getCachedCatalogs();if(active&&cached)setRanchOptions(cached.ranchos);try{const {data,error}=await supabase.from('cb_catalogs').select('ranchos').eq('id',1).maybeSingle();if(!error&&data&&active){const list=Array.isArray(data.ranchos)?data.ranchos:ranchos;setRanchOptions(list);await cacheCatalogs({ranchos:list,variedades:variedades});}}catch{/* se usa el catálogo local */}})();return()=>{active=false;};},[]);
   const [rows,setRows]=useState<Record<string,unknown>[]>([]);
   const [loading,setLoading]=useState(false),[exporting,setExporting]=useState(false);
   const load=async()=>{
@@ -441,7 +443,7 @@ function ReportsView(){
   const maxDaily=Math.max(1,...trend.map(x=>x[1]));
   return <><Text style={styles.heading}>Informes de calidad</Text>
     <Choice label="Periodo" options={['Hoy','7 días','30 días']} value={period} onChange={setPeriod}/>
-    <Choice label="Rancho" options={['Todos',...ranchos]} value={rancho} onChange={setRancho}/>
+    <Choice label="Rancho" options={['Todos',...ranchOptions]} value={rancho} onChange={setRancho}/>
     <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/><Button title={exporting?'Preparando Excel…':'Exportar Excel · 3 hojas'} disabled={exporting||rows.length===0} onPress={()=>void exportExcel()}/>
     <View style={styles.card}><Text style={styles.label}>Andenes: {anden.length} · Rechazos: {rejected}</Text>
       <Text style={styles.label}>Proceso: {proceso.length} · Potencial empacable promedio: {avg.toFixed(1)}%</Text></View>
