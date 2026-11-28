@@ -24,14 +24,14 @@ const Input = ({label,value,onChange,secure=false,keyboard='default',compact=fal
   <View style={{marginBottom:compact?7:12}}><Text style={[styles.label,compact&&{fontSize:12,marginBottom:3}]}>{label}</Text><TextInput autoCapitalize={keyboard==='email-address'?'none':'sentences'} secureTextEntry={secure} keyboardType={keyboard} style={compact?compactFieldStyle:fieldStyle} value={value} onChangeText={onChange}/></View>;
 const ModuleTile = ({icon,title,description,onPress}:{icon:string;title:string;description:string;onPress:()=>void}) =>
   <Pressable accessibilityRole="button" onPress={onPress} style={styles.moduleTile}><Text style={styles.moduleIcon}>{icon}</Text><View style={{flex:1}}><Text style={styles.moduleTitle}>{title}</Text><Text style={styles.moduleDescription}>{description}</Text></View><Text style={styles.moduleArrow}>›</Text></Pressable>;
-const Choice = ({label,options,value,onChange}: {label:string;options:string[];value:string;onChange:(v:string)=>void}) => {
+const Choice = ({label,options,value,onChange,compact=false}: {label:string;options:string[];value:string;onChange:(v:string)=>void;compact?:boolean}) => {
   const [expanded,setExpanded]=useState(false);
-  return <View style={{marginBottom:12}}>
-    <Text style={styles.label}>{label}</Text>
-    <Pressable accessibilityRole="button" accessibilityLabel={label+': '+value} accessibilityState={{expanded}} onPress={()=>setExpanded(open=>!open)} style={styles.dropdownHeader}>
-      <Text style={styles.dropdownValue}>{value||'Seleccionar'}</Text><Text style={styles.dropdownArrow}>{expanded?'▴':'▾'}</Text>
+  return <View style={{marginBottom:compact?7:12}}>
+    <Text style={[styles.label,compact&&{fontSize:12,marginBottom:3}]}>{label}</Text>
+    <Pressable accessibilityRole="button" accessibilityLabel={label+': '+value} accessibilityState={{expanded}} onPress={()=>setExpanded(open=>!open)} style={[styles.dropdownHeader,compact&&{borderRadius:9,paddingVertical:9,paddingHorizontal:11}]}>
+      <Text style={[styles.dropdownValue,compact&&{fontSize:13}]}>{value||'Seleccionar'}</Text><Text style={[styles.dropdownArrow,compact&&{fontSize:18}]}>{expanded?'▴':'▾'}</Text>
     </Pressable>
-    {expanded&&<View style={styles.dropdownOptions}>{options.map(v=><Pressable key={v} accessibilityRole="button" accessibilityState={{selected:value===v}} onPress={()=>{onChange(v);setExpanded(false);}} style={[styles.dropdownOption,value===v&&styles.dropdownOptionSelected]}><Text style={[styles.dropdownOptionText,value===v&&{color:C.burgundy,fontWeight:'700'}]}>{v}</Text>{value===v&&<Text style={{color:C.gold}}>✓</Text>}</Pressable>)}</View>}
+    {expanded&&<View style={styles.dropdownOptions}>{options.map(v=><Pressable key={v} accessibilityRole="button" accessibilityState={{selected:value===v}} onPress={()=>{onChange(v);setExpanded(false);}} style={[styles.dropdownOption,value===v&&styles.dropdownOptionSelected,compact&&{paddingVertical:9,paddingHorizontal:11}]}><Text style={[styles.dropdownOptionText,value===v&&{color:C.burgundy,fontWeight:'700'},compact&&{fontSize:13}]}>{v}</Text>{value===v&&<Text style={{color:C.gold}}>✓</Text>}</Pressable>)}</View>}
   </View>;
 };
 const errorMessage = (e:unknown):string => {
