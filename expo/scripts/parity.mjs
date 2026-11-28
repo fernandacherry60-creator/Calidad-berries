@@ -11,8 +11,8 @@ const andenCounts = {
   'Picada de pajaro': 1,
 };
 const originalAnden = {
-  pct_condicion: 2,
-  pct_apariencia: 6,
+  pct_condicion: 0.02,
+  pct_apariencia: 0.06,
   puntos_condicion: 50,
   puntos_apariencia: 25,
   puntos_total: 75,
