@@ -27,16 +27,16 @@ export const procesoDefects: Defect[] = [
   ['Pudricion / Hongo','Podrición / hongo','Cosecha'],['Sangrante','Exudación / Sangrante','Cosecha'],
   ['Colapsada','Colapsada / blanda','Cosecha'],['Sobre maduro','Sobre maduro','Cosecha'],
   ['Verde','Verde','Cosecha'],['Quebrada','Quebrada','Cosecha'],
-  ['Insectos / larva','Insecto / larva','Cosecha'],['Fruta buena','Fruta buena','Cosecha'],['Fumagina','Fumagina','Agronomia'],
-  ['Roya','Roya','Agronomia'],['Botrytis','Botrytis','Agronomia'],['Cenicilla','Cenicilla','Agronomia'],
+  ['Insectos / larva','Insecto / larva','Cosecha'],['Fumagina','Fumagina','Agronomia'],
+  ['Roya','Roya','Agronomia'],['Cenicilla','Cenicilla','Agronomia'],
   ['Avejigada','Avejigada','Agronomia'],['Mal formada','Malformada','Agronomia'],
   ['Extra chico','Extra chica','Agronomia'],['Bicolor','Bicolor','Agronomia'],
   ['Residuo de aplicacion','Residuo de aplicación','Agronomia'],
   ['Dano por chinche','Daño de chinche','Agronomia'],['Dano de trips','Daño de trips','Agronomia'],
   ['Pelicula blanca','Película blanca','Agronomia'],['Desgranada','Desgranada','Agronomia'],
   ['Picado de ave','Picada de pájaro','Actividades'],['Quemadura de sol','Quemadura de sol','Actividades'],
-  ['Dano por viento','Daño de viento','Actividades'],['Dano mecanico','Daño mecánico','Actividades'],['Deshidratada','Deshidratada','Actividades'],
-  ['Suciedad','Suciedad','Inocuidad'],['Excreta de pajaro','Excreta de pájaro','Inocuidad'],['Materia extrana','Materia extraña','Inocuidad'],
+  ['Dano por viento','Daño de viento','Actividades'],['Dano mecanico','Daño mecánico','Actividades'],
+  ['Suciedad','Suciedad','Inocuidad'],['Materia extrana','Materia extraña','Inocuidad'],
 ].map(([key,label,category])=>({key:String(key),label:String(label),category:String(category)}));
 export const canastosPorCajas = (cajas: number) => cajas<=0?0:Math.ceil(cajas/24);
 export function scoreAnden(counts: Record<string,number>, total: number, larvas=0) {
@@ -66,7 +66,7 @@ export function scoreProceso(counts: Record<string,number>, total: number, cajas
   let totalDefectos=0;
   for(const d of procesoDefects) {
     const pct=(counts[d.key]||0)/total*100;
-    percentages[d.key]=pct;if(d.key!=='Fruta buena'){areas[d.category]+=pct;totalDefectos+=pct;}
+    percentages[d.key]=pct;areas[d.category]+=pct;totalDefectos+=pct;
   }
   const potencial=['Verde','Quebrada','Mal formada','Extra chico']
     .reduce((sum,key)=>sum+(percentages[key]||0),0);
