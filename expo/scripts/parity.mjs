@@ -53,5 +53,5 @@ const flutterPct = (2 * 2.6) / (24 * 2.23 + 2 * 2.6) * 100;
 const expoPct = expoProcess.pct_proceso;
 assert.ok(expoPct !== null);
 assert.ok(Math.abs(expoPct - 10.080645161290322) < 1e-9);
-assert.ok(Math.abs(flutterPct - 8.855245683930943) < 1e-9);
+assert.ok(Math.abs(flutterPct - 8.85558583106267) < 1e-9);
 console.log('PASS: Andenes and process scoring parity; 25-defect catalogue; approved 3 kg Expo tare difference.');
