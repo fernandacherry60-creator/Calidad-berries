@@ -17,10 +17,14 @@ async function initializeDatabase() {
         table_name TEXT NOT NULL,
         payload TEXT NOT NULL,
         fecha TEXT NOT NULL,
-        synced INTEGER NOT NULL DEFAULT 0
+        synced INTEGER NOT NULL DEFAULT 0,
+        operation TEXT NOT NULL DEFAULT 'insert'
       );
+      
       CREATE INDEX IF NOT EXISTS samples_owner_pending ON samples(owner_id,synced);
     `);
+    const columns=await connection.getAllAsync<{name:string}>('PRAGMA table_info(samples)');
+    if(!columns.some(column=>column.name==='operation'))await connection.execAsync("ALTER TABLE samples ADD COLUMN operation TEXT NOT NULL DEFAULT 'insert'");
     return connection;
 }
 async function db() {
@@ -71,18 +75,24 @@ export async function updatePendingSample(uuid:string,ownerId:string,payload:Rec
 }
 export async function updateSyncedSample(table:TableName,uuid:string,ownerId:string,changes:Record<string,unknown>,profile:Profile){
   if(table==='semaforo')throw new Error('Esta edición solo admite andén y proceso.');
-  const {data:{user},error:authError}=await supabase.auth.getUser();
-  if(authError||!user||user.id!==profile.user_id||!profile.active)throw new Error('Sesión no válida para editar el registro.');
-  if(user.id!==ownerId&&profile.role!=='admin')throw new Error('Solo la administradora puede modificar muestreos de otros trabajadores.');
-  const {data,error}=await supabase.from(table).update(changes).eq('uuid',uuid).eq('owner_id',ownerId).select('uuid').maybeSingle();
-  if(error)throw error;
-  if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
+  if(!profile.active||profile.user_id!==ownerId&&profile.role!=='admin')throw new Error('No tienes permiso para editar este registro.');
   const connection=await db();
   const row=await connection.getFirstAsync<LocalSample>('SELECT * FROM samples WHERE uuid=? AND owner_id=?',[uuid,ownerId]);
-  if(row){
-    const updated={...JSON.parse(row.payload),...changes};
-    await connection.runAsync('UPDATE samples SET payload=? WHERE uuid=? AND owner_id=?',[JSON.stringify(updated),uuid,ownerId]);
+  const updated={...(row?JSON.parse(row.payload):{}),...changes,uuid,owner_id:ownerId};
+  const network=await NetInfo.fetch();
+  if(!network.isConnected||network.isInternetReachable===false){
+    if(ownerId!==profile.user_id)throw new Error('Para editar registros de otro trabajador se requiere conexión.');
+    if(!row)throw new Error('No existe una copia local de este registro; abre el historial sincronizado cuando tengas internet.');
+    await connection.runAsync("UPDATE samples SET payload=?,synced=0,operation='update' WHERE uuid=? AND owner_id=?",[JSON.stringify(updated),uuid,ownerId]);
+    return;
   }
+  const {data:{user},error:authError}=await supabase.auth.getUser();
+  if(authError||!user||user.id!==profile.user_id)throw new Error('Sesión no válida para editar el registro.');
+  const {uuid:_uuid,owner_id:_owner,...fields}=changes;
+  const {data,error}=await supabase.from(table).update(fields).eq('uuid',uuid).eq('owner_id',ownerId).select('uuid').maybeSingle();
+  if(error)throw error;
+  if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
+  if(row)await connection.runAsync('UPDATE samples SET payload=?,synced=1,operation=\'insert\' WHERE uuid=? AND owner_id=?',[JSON.stringify(updated),uuid,ownerId]);
 }
 export async function pendingCount(ownerId: string) {
   const connection = await db();
@@ -118,17 +128,21 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
           ...payload, owner_id: user.id, usuario_email: profile.email,
           usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
         };
-        const { error } = await supabase.from(row.table_name).insert(sanitized);
-        if (error) {
-          if (error.code !== '23505') throw error;
-          // Si la petición anterior llegó al servidor pero se perdió la respuesta,
-          // confirmar el UUID bajo RLS antes de marcarlo como sincronizado.
-          const check = await supabase.from(row.table_name).select('uuid')
-            .eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
-          if (check.error) throw check.error;
-          if (!check.data) throw new Error('No se pudo confirmar un registro duplicado: '+row.uuid);
+        if(row.operation==='update'){
+          const {uuid:_uuid,owner_id:_owner,...fields}=sanitized;
+          const {data,error}=await supabase.from(row.table_name).update(fields).eq('uuid',row.uuid).eq('owner_id',user.id).select('uuid').maybeSingle();
+          if(error)throw error;
+          if(!data)throw new Error('No se pudo sincronizar la edición del registro '+row.uuid);
+        }else{
+          const { error } = await supabase.from(row.table_name).insert(sanitized);
+          if (error) {
+            if (error.code !== '23505') throw error;
+            const check = await supabase.from(row.table_name).select('uuid').eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
+            if (check.error) throw check.error;
+            if (!check.data) throw new Error('No se pudo confirmar un registro duplicado: '+row.uuid);
+          }
         }
-        await connection.runAsync('UPDATE samples SET synced=1 WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
+        await connection.runAsync('UPDATE samples SET synced=1,operation='insert' WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
         uploaded++;
       }
     }
