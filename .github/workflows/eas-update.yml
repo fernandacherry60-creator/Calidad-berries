@@ -47,6 +47,9 @@ jobs:
         run: npm run test:parity
       - name: Install EAS CLI
         run: npm install --global eas-cli
+      - name: Build Android Preview once for the new native camera and file modules
+        if: contains(github.event.head_commit.message, 'Prepare Android native runtime 1.0.1')
+        run: eas build --platform android --profile preview --non-interactive --wait
       - name: Publish Android preview OTA update
         run: >-
           eas update --branch preview --platform android --message "QUALYX Android: ajustes de muestreo, reglas de calidad y retiro de módulos" --non-interactive
