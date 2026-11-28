@@ -143,7 +143,7 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
         }
         const {fotos_locales:_localPhotos,...basePayload}=payload;
         const sanitized = {
-          ...basePayload, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: user.id, usuario_email: profile.email,
+          ...basePayload, uuid:row.uuid, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: user.id, usuario_email: profile.email,
           usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
         };
         if(row.operation==='update'){
