@@ -85,7 +85,7 @@ export async function cacheRemoteSample(table:TableName,payload:Record<string,un
 }
 export async function localTeamSamples():Promise<LocalSample[]>{
   const connection=await db();
-  return connection.getAllAsync<LocalSample>("SELECT * FROM samples ORDER BY fecha DESC LIMIT 500");
+  return connection.getAllAsync<LocalSample>("SELECT * FROM samples ORDER BY fecha DESC");
 }
 export async function cacheTeamProfiles(profiles:Profile[]){
   await SecureStore.setItemAsync('quality_team_profiles',JSON.stringify(profiles));
