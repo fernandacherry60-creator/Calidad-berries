@@ -46,4 +46,5 @@ jobs:
       - name: Install EAS CLI
         run: npm install --global eas-cli
       - name: Publish preview OTA update
-        run: eas update --branch preview --message "QUALYX: ajustes de muestreo, reglas de calidad y retiro de módulos" --non-interactive
+        run: >-
+          eas update --branch preview --message "QUALYX: ajustes de muestreo, reglas de calidad y retiro de módulos" --non-interactive
