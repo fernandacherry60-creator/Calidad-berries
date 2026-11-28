@@ -30,3 +30,8 @@ create policy "cb_catalogs_read_authenticated" on public.cb_catalogs
 create policy "cb_catalogs_admin_update" on public.cb_catalogs
   for update to authenticated using (public.cb_is_admin()) with check (public.cb_is_admin());
 grant select, update on public.cb_catalogs to authenticated;
+
+create policy "evidencias_update_propias"
+on storage.objects for update to authenticated
+using (bucket_id='evidencias-muestreos' and (storage.foldername(name))[1]=(select auth.uid())::text)
+with check (bucket_id='evidencias-muestreos' and (storage.foldername(name))[1]=(select auth.uid())::text);
