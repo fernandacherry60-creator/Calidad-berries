@@ -9,7 +9,7 @@ import { andenDefects, procesoDefects, scoreAnden, scoreProceso, ranchos, varied
 
 type Screen = 'home'|'team'|'history'|'anden'|'proceso'|'semaforo'|'cultivos'|'calculadora'|'pesos'|'ayuda'|'informes';
 const C = { ink:'#502027', green:'#A52A35', cream:'#FFF9F3', muted:'#80636A', line:'#E8CBA3', white:'#FFFFFF', danger:'#B71C32', gold:'#BD8A30', burgundy:'#651B2B' };
-const fieldStyle = { borderWidth:1,borderColor:C.line,borderRadius:12,padding:12,backgroundColor:C.white,fontSize:15,color:C.ink,fontStyle:'italic' } as const;
+const fieldStyle = { borderWidth:1,borderColor:C.line,borderRadius:10,padding:9,backgroundColor:C.white,fontSize:14,color:C.ink,fontStyle:'italic' } as const;
 const processColor = (pct:number|null) => pct===null?'#80636A':pct<=5?'#16803C':pct<10?'#BD8A30':C.danger;
 const processLabel = (pct:number|null) => pct===null?'Sin calcular':pct<=5?'ÓPTIMO':pct<10?'PRECAUCIÓN':'ALTO';
 const Button = ({title,onPress,disabled=false}: {title:string;onPress:()=>void;disabled?:boolean}) =>
@@ -532,7 +532,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
           <Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable>
         </View>)}
       {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
-       <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}setStep(3);}}/></>}
+       <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}if(kind==='proceso'&&(!empacable.trim()||!Number.isFinite(n(empacable))||n(empacable)<0||n(empacable)>100)){Alert.alert('Dato obligatorio','Captura el porcentaje empacable entre 0 y 100 antes de continuar.');return;}setStep(3);}}/></>}
        {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.capturePreviewSheet}>
          <Text style={styles.capturePreviewTitle}>{kind==='anden'?'MUESTREO DE ANDÉN':'MUESTREO DE PROCESO'}</Text>
          <Text style={styles.label}>Rancho: {rancho} · Frutos: {frutos} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
@@ -555,7 +555,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso'|'sem
           <Text style={styles.capturePreviewTitle}>RESUMEN DE MUESTREO</Text>
           <Text style={styles.capturePreviewMeta}>{new Date().toLocaleDateString('es-MX')} · {rancho}{sector?' · '+sector:''}</Text>
           <Text style={styles.capturePreviewMeta}>Frutos: {frutos} · Contados: {countedPreview} {kind==='anden'?'· Embaladora: '+(embaladora||'—'):''}</Text>
-          {andenPreview&&<Text style={styles.capturePreviewStatus}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
+          {andenPreview&&<Text style={[styles.capturePreviewStatus,{color:andenPreview.disposicion==='RECHAZO'?C.danger:andenPreview.disposicion==='REEMPAQUE'?'#A66B00':'#17663B',backgroundColor:andenPreview.disposicion==='RECHAZO'?'#FCE4E4':andenPreview.disposicion==='REEMPAQUE'?'#FFF3D6':'#E5F3E8'}]}>{andenPreview.disposicion} · {andenPreview.puntos_total} pts · Cond. {(andenPreview.pct_condicion*100).toFixed(1)}% · Apar. {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text>}
           {procesoPreview&&<><Text style={styles.capturePreviewStatus}>Proceso {(procesoPreview.pct_proceso?.toFixed(1)??'—')}% · Empacable {empacable||'—'}%</Text><Text style={styles.capturePreviewMeta}>Agronomía {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha {procesoPreview.area_cosecha.toFixed(1)}%</Text><Text style={styles.capturePreviewMeta}>Actividades {procesoPreview.area_actividades.toFixed(1)}% · Inocuidad {procesoPreview.area_inocuidad.toFixed(1)}%</Text></>}
           <View style={styles.capturePreviewColumns}><Text style={styles.capturePreviewColumnTitle}>DEFECTO</Text><Text style={styles.capturePreviewColumnTitle}>CANT.</Text><Text style={styles.capturePreviewColumnTitle}>%</Text></View>
           <View style={styles.capturePreviewGrid}>
