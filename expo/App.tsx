@@ -468,7 +468,7 @@ function ReportsView(){
     }catch(e){
       try{
         const cached=await localTeamSamples();
-        const localRows=cached.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tabla:row.table_name}));
+        const localRows:Record<string,unknown>[]=cached.map(row=>{const payload=JSON.parse(row.payload) as Record<string,unknown>;return {...payload,tabla:row.table_name};});
         const filtered=localRows.filter(row=>{
           const date=String(row.fecha||'');
           return (date>=from.toISOString())&&(!until||date<until.toISOString())&&(rancho==='Todos'||row.rancho===rancho);
