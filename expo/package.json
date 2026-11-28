@@ -9,7 +9,8 @@
     "check": "tsc --noEmit",
     "doctor": "expo-doctor",
     "build": "eas build --platform android --profile preview",
-    "update": "eas update --channel preview"
+    "update": "eas update --channel preview",
+    "test:parity": "node --experimental-strip-types scripts/parity.mjs"
   },
   "dependencies": {
     "expo": "~54.0.0",
