@@ -83,19 +83,19 @@ export async function updateSyncedSample(table:TableName,uuid:string,ownerId:str
   const row=await connection.getFirstAsync<LocalSample>('SELECT * FROM samples WHERE uuid=? AND owner_id=?',[uuid,ownerId]);
   const updated={...(row?JSON.parse(row.payload):{}),...changes,uuid,owner_id:ownerId};
   const network=await NetInfo.fetch();
-  if(!network.isConnected||network.isInternetReachable===false){
-    if(ownerId!==profile.user_id)throw new Error('Para editar registros de otro trabajador se requiere conexión.');
-    if(!row)throw new Error('No existe una copia local de este registro; abre el historial sincronizado cuando tengas internet.');
+  if(row&&ownerId===profile.user_id){
     await connection.runAsync("UPDATE samples SET payload=?,synced=0,operation='update' WHERE uuid=? AND owner_id=?",[JSON.stringify(updated),uuid,ownerId]);
+    if(network.isConnected&&network.isInternetReachable!==false)await syncSamples(profile);
     return;
   }
+  if(!network.isConnected||network.isInternetReachable===false)throw new Error('Para editar un registro que no está guardado en este teléfono se requiere conexión.');
   const {data:{user},error:authError}=await supabase.auth.getUser();
   if(authError||!user||user.id!==profile.user_id)throw new Error('Sesión no válida para editar el registro.');
-  const {uuid:_uuid,owner_id:_owner,...fields}=changes;
+  const {uuid:_uuid,owner_id:_owner,fotos_locales:_localPhotos,...fields}=changes;
   const {data,error}=await supabase.from(table).update(fields).eq('uuid',uuid).eq('owner_id',ownerId).select('uuid').maybeSingle();
   if(error)throw error;
   if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
-  if(row)await connection.runAsync('UPDATE samples SET payload=?,synced=1,operation=\'insert\' WHERE uuid=? AND owner_id=?',[JSON.stringify(updated),uuid,ownerId]);
+  if(row)await connection.runAsync("UPDATE samples SET payload=?,synced=1,operation='insert' WHERE uuid=? AND owner_id=?",[JSON.stringify(updated),uuid,ownerId]);
 }
 export async function pendingCount(ownerId: string) {
   const connection = await db();
@@ -142,7 +142,7 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
         }
         const {fotos_locales:_localPhotos,...basePayload}=payload;
         const sanitized = {
-          ...basePayload, fotos_json:[...storedPhotos,...uploadedPhotos], owner_id: user.id, usuario_email: profile.email,
+          ...basePayload, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: user.id, usuario_email: profile.email,
           usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
         };
         if(row.operation==='update'){
