@@ -466,8 +466,8 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
         defectCounts[d.key]=value;
       }
       const uuid=Crypto.randomUUID(),fecha=new Date().toISOString();
-      let payload:Record<string,unknown>;
-      let table:TableName;
+      let payload:Record<string,unknown>|null=null;
+      let table:TableName|null=null;
       if(kind==='anden'){
         if(Object.values(defectCounts).reduce((a,b)=>a+b,0)>total)throw new Error('Los defectos superan el total de frutos');
         const score=scoreAnden(defectCounts,total,larva);
@@ -485,6 +485,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
         payload={uuid,fecha,cultivo:'Frambuesa',frutos_muestra:total,rancho,presentacion,cuadrilla,muestreados:embaladora,peso:peso?n(peso):null,frutos_larva:larva,cajas:box,taras:t,...score,...identity(profile)};
         table='muestreos_proceso';
       }
+      if(!payload||!table)throw new Error('Tipo de muestreo no válido');
       if(editing){
         // Preservar la identidad y la fecha originales para evitar duplicados.
         const original=JSON.parse(editing.payload) as Record<string,unknown>;
