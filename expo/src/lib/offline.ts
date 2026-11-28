@@ -159,7 +159,7 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
             if (!check.data) throw new Error('No se pudo confirmar un registro duplicado: '+row.uuid);
           }
         }
-        await connection.runAsync('UPDATE samples SET synced=1,operation='insert' WHERE uuid=? AND owner_id=?',[row.uuid,user.id]);
+        await connection.runAsync("UPDATE samples SET synced=1,operation='insert' WHERE uuid=? AND owner_id=?",[row.uuid,user.id]);
         uploaded++;
       }
     }
