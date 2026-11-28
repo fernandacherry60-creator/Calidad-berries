@@ -531,7 +531,6 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
          <View style={styles.capturePreviewGrid}>{activeDefects.map(d=><View key={d.key} style={[styles.capturePreviewItem,{paddingVertical:4}]}><Text style={[styles.capturePreviewDefect,{fontSize:11}]}>{d.label}</Text><Text style={styles.capturePreviewCount}>{counts[d.key]}</Text><Text style={styles.capturePreviewPercent}>{(n(counts[d.key]||'0')/totalPreview*100).toFixed(1)}%</Text></View>)}</View>
          <View style={styles.capturePreviewFooter}><Text style={styles.capturePreviewFooterText}>FRUTOS CONTADOS</Text><Text style={styles.capturePreviewFooterText}>{countedPreview} / {totalPreview}</Text></View>
        </View></>}
-    </>}
     {step===3&&kind==='anden'&&!editing&&<Choice label="Después de guardar" options={['Volver al inicio','Otro andén con los mismos datos']} value={continueAnden?'Otro andén con los mismos datos':'Volver al inicio'} onChange={v=>setContinueAnden(v.startsWith('Otro'))}/>}
       {step===3&&<><Button title="Ver resumen compacto para captura" onPress={()=>setSharePreview(true)}/>
     <Modal visible={sharePreview} animationType="slide" onRequestClose={()=>setSharePreview(false)}>
