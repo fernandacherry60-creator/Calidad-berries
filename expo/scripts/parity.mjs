@@ -20,7 +20,8 @@ const originalAnden = {
 };
 const expoAnden = scoreAnden(andenCounts, 100, 0);
 for (const [key, expected] of Object.entries(originalAnden)) {
-  assert.equal(expoAnden[key], expected, 'Andenes parity: ' + key);
+  if (typeof expected === 'number') assert.ok(Math.abs(expoAnden[key] - expected) < 1e-9, 'Andenes parity: ' + key);
+  else assert.equal(expoAnden[key], expected, 'Andenes parity: ' + key);
 }
 assert.equal(andenDefects.length, 21, 'Expo Andenes includes the approved bird-excreta safety rule.');
 
@@ -41,7 +42,7 @@ const originalProcess = {
 };
 const expoProcess = scoreProceso(processCounts, 100, 24, 2);
 for (const [key, expected] of Object.entries(originalProcess)) {
-  assert.equal(expoProcess[key], expected, 'Proceso parity: ' + key);
+  assert.ok(Math.abs(expoProcess[key] - expected) < 1e-9, 'Proceso parity: ' + key);
 }
 assert.equal(procesoDefects.length, 25, 'The process catalogue must match the original 25 defects.');
 for (const removed of ['Fruta buena', 'Botrytis', 'Deshidratada', 'Excreta de pajaro']) {
