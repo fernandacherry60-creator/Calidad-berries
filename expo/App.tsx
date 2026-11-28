@@ -361,7 +361,7 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
 }
 function CatalogsView(){
   const [ranchosList,setRanchosList]=useState(ranchos),[variedadesList,setVariedadesList]=useState(variedades);
-  const [newRancho,setNewRancho]=useState(''),[newVariedad,setNewVariedad]='';
+  const [newRancho,setNewRancho]=useState(''),[newVariedad,setNewVariedad]=useState('');
   const [loading,setLoading]=useState(false);
   useEffect(()=>{let active=true;(async()=>{try{const {data,error}=await supabase.from('cb_catalogs').select('ranchos,variedades').eq('id',1).maybeSingle();if(error)throw error;if(active&&data){setRanchosList(data.ranchos||ranchos);setVariedadesList(data.variedades||variedades);}}catch(e){Alert.alert('Catálogos',errorMessage(e));}})();return()=>{active=false;};},[]);
   const save=async(nextRanchos:string[],nextVariedades:string[])=>{setLoading(true);try{const {data,error}=await supabase.from('cb_catalogs').update({ranchos:nextRanchos,variedades:nextVariedades,updated_at:new Date().toISOString()}).eq('id',1).select('id').maybeSingle();if(error)throw error;if(!data)throw new Error('No se guardaron los cambios. Verifica que tu perfil tenga permisos de administración.');const next={ranchos:nextRanchos,variedades:nextVariedades};await cacheCatalogs(next);setRanchosList(nextRanchos);setVariedadesList(nextVariedades);Alert.alert('Catálogos','Cambios guardados. Los teléfonos los descargarán al conectarse.');}catch(e){Alert.alert('No se pudo guardar',errorMessage(e));}finally{setLoading(false);}};
