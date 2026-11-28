@@ -26,6 +26,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verificar TypeScript
         run: npx tsc --noEmit
+      - name: Comparar resultados Flutter y Expo
+        run: npm run test:parity
       - name: Comprobar Expo Doctor
         run: npx expo-doctor
       - name: Comprobar Expo config y EAS projectId
