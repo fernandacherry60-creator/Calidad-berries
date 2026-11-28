@@ -329,7 +329,7 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
       const {data,error}=await supabase.from('cb_profiles').select('*').order('display_name');
       if(error)throw error;setMembers((data||[]) as Profile[]);
       const all:Record<string,unknown>[]=[];
-      for(const table of ['muestreos_anden','muestreos_proceso','semaforo'] as TableName[]){
+      for(const table of ['muestreos_anden','muestreos_proceso'] as TableName[]){
         const result=await supabase.from(table).select('*').order('fecha',{ascending:false}).limit(50);
         if(result.error)throw result.error;
         all.push(...(result.data||[]).map(item=>({...item,tipo:table})));
@@ -357,7 +357,7 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
     <Text style={styles.section}>Personal ({members.length})</Text>
     {members.map(m=><View key={m.user_id} style={styles.card}><Text style={styles.label}>{m.display_name} · {m.role}</Text><Text>{m.email} · {m.puesto} · {m.active?'Activo':'Inactivo'}</Text></View>)}
     <Text style={styles.section}>Últimos muestreos en la nube</Text>
-    {samples.filter(m=>m.tipo!=='semaforo').map(m=><View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{String(m.tipo)} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text>{m.tipo!=='semaforo'&&<Button title="Modificar este muestreo" onPress={()=>onEdit({uuid:String(m.uuid),owner_id:String(m.owner_id),table_name:m.tipo as TableName,payload:JSON.stringify(m),fecha:String(m.fecha),synced:1})}/>}</View>)}
+    {samples.map(m=>{const isAnden=m.tipo==='muestreos_anden';const disposition=String(m.disposicion||'');const statusColor=disposition==='RECHAZO'?C.danger:disposition==='REEMPAQUE'?'#A66B00':'#16803C';const statusBg=disposition==='RECHAZO'?'#FCE4E4':disposition==='REEMPAQUE'?'#FFF3D6':'#E5F3E8';return <View key={String(m.uuid)} style={styles.card}><Text style={styles.label}>{isAnden?'Andenes':'Fruta proceso'} · {String(m.cultivo)}</Text><Text>{String(m.usuario_nombre||m.usuario_email||'Sin nombre')}</Text><Text>{String(m.fecha)}</Text>{isAnden?<Text style={{fontWeight:'900',color:statusColor,backgroundColor:statusBg,padding:8,borderRadius:8,marginVertical:5}}>{disposition}</Text>:<Text>Empacable {Number(m.potencial_empacable||0).toFixed(1)}%</Text>}<Button title="Modificar este muestreo" onPress={()=>onEdit({uuid:String(m.uuid),owner_id:String(m.owner_id),table_name:m.tipo as TableName,payload:JSON.stringify(m),fecha:String(m.fecha),synced:1})}/></View>;})}
   </>;
 }
 function CatalogsView(){
