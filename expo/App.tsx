@@ -339,14 +339,25 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
         for(const record of records)await cacheRemoteSample(table,record);
         all.push(...records.map(item=>({...item,tipo:table})));
       }
-      all.sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));setSamples(all);setOfflineMode(false);
+      const cachedRows=await localTeamSamples();
+      const cachedById=new Map(cachedRows.map(row=>[row.uuid,row]));
+      const visible=new Map<string,Record<string,unknown>>();
+      for(const item of all){
+        const local=cachedById.get(String(item.uuid));
+        visible.set(String(item.uuid),local&&local.synced===0
+          ? {...JSON.parse(local.payload) as Record<string,unknown>,tipo:item.tipo,_localRow:local}
+          : {...item,_localRow:local});
+      }
+      for(const local of cachedRows.filter(row=>row.synced===0)){
+        if(!visible.has(local.uuid))visible.set(local.uuid,{...JSON.parse(local.payload) as Record<string,unknown>,tipo:local.table_name,_localRow:local});
+      }
+      const combined=[...visible.values()].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
+      setSamples(combined);setOfflineMode(false);
     }catch(e){
       const [cachedMembers,cachedRows]=await Promise.all([getCachedTeamProfiles(),localTeamSamples()]);
       if(cachedMembers.length)setMembers(cachedMembers);
-      if(cachedRows.length){
-        setSamples(cachedRows.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tipo:row.table_name,_localRow:row})).filter(row=>row.tipo==='muestreos_anden'||row.tipo==='muestreos_proceso'));
-        setOfflineMode(true);
-      }else Alert.alert('Consulta',errorMessage(e));
+      setSamples(cachedRows.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tipo:row.table_name,_localRow:row})).filter(row=>row.tipo==='muestreos_anden'||row.tipo==='muestreos_proceso'));
+      setOfflineMode(true);
     }
   },[]);
   useEffect(()=>{void refresh();},[refresh]);
@@ -398,7 +409,7 @@ function CalculatorView(){
     <View style={{flexDirection:'row',gap:10}}><View style={{flex:1}}><Input label="Frutos totales" value={total} onChange={setTotal} keyboard="numeric"/></View><View style={{flex:1}}><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></View></View>
     {['condicion','apariencia'].map(group=><><Text style={styles.section}>{group==='condicion'?'Condición · límite 5%':'Apariencia · reempaque 15–15.5%, rechazo desde 15.6%'}</Text>
       <View style={{flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between',gap:7}}>{andenDefects.filter(d=>d.category===group).map(d=><View key={d.key} style={[styles.defectRow,{width:'48%',flexGrow:1,flexBasis:'47%',marginBottom:0,paddingVertical:8}]}><View style={{flex:1}}><Text style={styles.defectTitle}>{d.label}</Text><Text style={styles.defectCategory}>{sample>0?(values[d.key]/sample*100).toFixed(1)+'%':'—'}</Text></View><Pressable accessibilityLabel={'Restar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(Math.max(0,n(prev[d.key]||'0')-1))}))} style={styles.counterButton}><Text style={styles.counterText}>−</Text></Pressable><Text style={styles.counterValue}>{counts[d.key]||'0'}</Text><Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable></View>)}
-    </>)}
+    </View></>)}
     <View style={styles.card}><Text style={styles.label}>Frutos contados: {counted} / {sample||0}</Text>{!valid&&<Text style={{color:C.danger}}>Revisa los conteos: deben ser enteros y no superar el total de frutos.</Text>}
       {result&&<><Text style={[styles.big,{color:result.disposicion==='RECHAZO'?C.danger:result.disposicion==='REEMPAQUE'?C.gold:'#16803C'}]}>{result.disposicion}</Text><Text>Condición: {(result.pct_condicion*100).toFixed(1)}% · Apariencia: {(result.pct_apariencia*100).toFixed(1)}%</Text><Text>Puntos: {result.puntos_total}/80 · Larvas: {larva}</Text></>}
       <Button title="Limpiar calculadora" onPress={()=>{setCounts({});setTotal('100');setLarvas('0');}}/></View></>;
