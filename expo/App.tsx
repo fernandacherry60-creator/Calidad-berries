@@ -1,10 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Updates from 'expo-updates';
-import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
-import * as XLSX from 'xlsx';
 import * as Linking from 'expo-linking';
 import * as Crypto from 'expo-crypto';
 import NetInfo from '@react-native-community/netinfo';
@@ -403,7 +399,7 @@ function ReportsView(){
   const [ranchOptions,setRanchOptions]=useState(ranchos);
   useEffect(()=>{let active=true;(async()=>{const cached=await getCachedCatalogs();if(active&&cached)setRanchOptions(cached.ranchos);try{const {data,error}=await supabase.from('cb_catalogs').select('ranchos').eq('id',1).maybeSingle();if(!error&&data&&active){const list=Array.isArray(data.ranchos)?data.ranchos:ranchos;setRanchOptions(list);await cacheCatalogs({ranchos:list,variedades:variedades});}}catch{/* se usa el catálogo local */}})();return()=>{active=false;};},[]);
   const [rows,setRows]=useState<Record<string,unknown>[]>([]);
-  const [loading,setLoading]=useState(false),[exporting,setExporting]=useState(false);
+  const [loading,setLoading]=useState(false);
   const load=async()=>{
     setLoading(true);
     try{
@@ -435,7 +431,6 @@ function ReportsView(){
     }
   }
   const topDefects=Object.entries(defectTotals).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  const exportExcel=async()=>{setExporting(true);try{const book=XLSX.utils.book_new();const andRows=anden.map(r=>({Fecha:r.fecha,Rancho:r.rancho,Sector:r.sector,Cultivo:r.cultivo,Variedad:r.variedad,Presentacion:r.presentacion,Cuadrilla:r.cuadrilla,Licencia:r.licencia,Evaluador:r.evaluador,Embaladora:r.muestreados,Cajas:r.cajas_recibidas,Canastos:r.canastos,Frutos:r.fruta_muestra,Brix:r.grados_brix,Peso:r.peso,Larvas:r.frutos_larva,Condicion:r.pct_condicion,Apariencia:r.pct_apariencia,PuntosCondicion:r.puntos_condicion,PuntosApariencia:r.puntos_apariencia,PuntosTotal:r.puntos_total,Disposicion:r.disposicion,Motivo:r.motivo,Defectos:JSON.stringify(r.defectos_json||{}),Fotos:JSON.stringify(r.fotos_json||[])}));const processRows=proceso.map(r=>({Fecha:r.fecha,Rancho:r.rancho,Cultivo:r.cultivo,Cajas:r.cajas,Taras:r.taras,PorcentajeProceso:r.pct_proceso,FrutosMuestra:r.frutos_muestra,AreaAgronomia:r.area_agronomia,AreaPoscosecha:r.area_poscosecha,AreaCosecha:r.area_cosecha,AreaActividades:r.area_actividades,AreaInocuidad:r.area_inocuidad,TotalDefectos:r.total_defectos,PotencialEmpacable:r.potencial_empacable,Defectos:JSON.stringify(r.defectos_json||{})}));const days=[...new Set([...anden,...proceso].map(r=>String(r.fecha||'').slice(0,10)))].sort();const summaryRows:any[][]=[['REPORTE DE CALIDAD DE BERRIES'],['Generado',new Date().toLocaleString('es-MX')],[],['ANDENES - RESUMEN POR DIA'],['Fecha','Tarimas','Paso','Reempaque','Rechazo','% Rechazo','Puntos promedio']];let sumTarimas=0,sumPaso=0,sumReempaque=0,sumRechazo=0;for(const day of days){const group=anden.filter(r=>String(r.fecha||'').slice(0,10)===day);if(!group.length)continue;const paso=group.filter(r=>r.disposicion==='PASO').length;const reempaque=group.filter(r=>r.disposicion==='REEMPAQUE'||r.disposicion==='PRE-RECHAZO').length;const rechazo=group.filter(r=>r.disposicion==='RECHAZO').length;const points=group.reduce((s,r)=>s+Number(r.puntos_total||0),0)/group.length;sumTarimas+=group.length;sumPaso+=paso;sumReempaque+=reempaque;sumRechazo+=rechazo;summaryRows.push([day,group.length,paso,reempaque,rechazo,Number((rechazo/group.length*100).toFixed(1)),Number(points.toFixed(1))]);}summaryRows.push(['TOTAL',sumTarimas,sumPaso,sumReempaque,sumRechazo,sumTarimas?Number((sumRechazo/sumTarimas*100).toFixed(1)):0,'']);summaryRows.push([],['FRUTA PROCESO - RESUMEN POR DIA'],['Fecha','Muestreos','Potencial empacable promedio (%)']);for(const day of days){const group=proceso.filter(r=>String(r.fecha||'').slice(0,10)===day);if(group.length)summaryRows.push([day,group.length,Number((group.reduce((s,r)=>s+Number(r.potencial_empacable||0),0)/group.length).toFixed(1))]);}if(!anden.length)summaryRows.push(['Sin muestreos de andén en el periodo']);if(!proceso.length)summaryRows.push(['Sin muestreos de proceso en el periodo']);XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(summaryRows),'Resumen');XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(andRows),'Andenes');XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(processRows),'Fruta proceso');const base64=XLSX.write(book,{type:'base64',bookType:'xlsx'});const uri=(FileSystem.cacheDirectory||'')+'qualyx_reporte_'+Date.now()+'.xlsx';await FileSystem.writeAsStringAsync(uri,base64,{encoding:FileSystem.EncodingType.Base64});await Sharing.shareAsync(uri,{mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',dialogTitle:'Exportar reporte QUALYX'});}catch(e){Alert.alert('Exportación Excel',errorMessage(e));}finally{setExporting(false);}};
   const maxDefect=Math.max(1,...topDefects.map(x=>x[1]));
   const daily:Record<string,number>={};
   for(const r of rows){const day=String(r.fecha).slice(0,10);daily[day]=(daily[day]||0)+1;}
@@ -444,7 +439,7 @@ function ReportsView(){
   return <><Text style={styles.heading}>Informes de calidad</Text>
     <Choice label="Periodo" options={['Hoy','7 días','30 días']} value={period} onChange={setPeriod}/>
     <Choice label="Rancho" options={['Todos',...ranchOptions]} value={rancho} onChange={setRancho}/>
-    <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/><Button title={exporting?'Preparando Excel…':'Exportar Excel · 3 hojas'} disabled={exporting||rows.length===0} onPress={()=>void exportExcel()}/>
+    <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/>
     <View style={styles.card}><Text style={styles.label}>Andenes: {anden.length} · Rechazos: {rejected}</Text>
       <Text style={styles.label}>Proceso: {proceso.length} · Potencial empacable promedio: {avg.toFixed(1)}%</Text></View>
     <Text style={styles.section}>Gráfica de defectos más frecuentes</Text>
@@ -470,7 +465,6 @@ function HistoryView({profile,onEdit}:{profile:Profile;onEdit:(row:LocalSample)=
 function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';profile:Profile;onSaved:()=>Promise<void>;editing:LocalSample|null}){
   const [rancho,setRancho]=useState(ranchos[0]),[sector,setSector]=useState(''),[variedad,setVariedad]=useState(variedades[0]);
   const [licencia,setLicencia]=useState(''),[brix,setBrix]=useState('');
-  const [photos,setPhotos]=useState<string[]>([]),[storedPhotoPaths,setStoredPhotoPaths]=useState<string[]>([]);
   const [catalogOptions,setCatalogOptions]=useState({ranchos,variedades});
   const [presentacion,setPresentacion]=useState('6 oz'),[cuadrilla,setCuadrilla]=useState('');
   const [cajas,setCajas]=useState('0'),[taras,setTaras]=useState('0'),[frutos,setFrutos]=useState('100');
@@ -499,7 +493,6 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
     const p=JSON.parse(editing.payload) as Record<string,unknown>;
     setRancho(String(p.rancho||ranchos[0]));setSector(String(p.sector||''));setVariedad(String(p.variedad||variedades[0]));
     setLicencia(String(p.licencia||''));setBrix(p.grados_brix==null?'':String(p.grados_brix));
-    setPhotos(Array.isArray(p.fotos_locales)?p.fotos_locales.filter((v):v is string=>typeof v==='string'):[]);setStoredPhotoPaths(Array.isArray(p.fotos_json)?p.fotos_json.filter((v):v is string=>typeof v==='string'):[]);
     setPresentacion(String(p.presentacion||'6 oz'));setCuadrilla(String(p.cuadrilla||''));
     setCajas(String(p.cajas_recibidas??p.cajas??0));setTaras(String(p.taras??0));
     setFrutos(String(p.fruta_muestra??p.frutos_muestra??100));setLarvas(String(p.frutos_larva??0));
@@ -527,7 +520,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
         const score=scoreAnden(defectCounts,total,larva);
         payload={uuid,fecha,cultivo:'Frambuesa',rancho,sector,variedad,presentacion,cuadrilla,licencia,grados_brix:brix?n(brix):null,
           cajas_recibidas:box,canastos:canastosPorCajas(box),fruta_muestra:total,
-          peso:peso?n(peso):null,frutos_larva:larva,fotos_locales:photos,fotos_json:storedPhotoPaths,
+          peso:peso?n(peso):null,frutos_larva:larva,
           evaluador:profile.display_name,muestreados:embaladora,defectos_json:defectCounts,
           ...score,motivo:nota,...identity(profile)};
         table='muestreos_anden';
@@ -573,7 +566,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
           <Text style={styles.counterValue}>{counts[d.key]||'0'}</Text>
           <Pressable accessibilityLabel={'Sumar '+d.label} onPress={()=>setCounts(prev=>({...prev,[d.key]:String(n(prev[d.key]||'0')+1)}))} style={styles.counterButton}><Text style={styles.counterText}>+</Text></Pressable>
         </View>)}
-      {kind==='anden'&&<><Input label="Observaciones" value={nota} onChange={setNota}/><Text style={styles.section}>Evidencia fotográfica</Text><Button title="Tomar fotografía" onPress={async()=>{try{const permission=await ImagePicker.requestCameraPermissionsAsync();if(!permission.granted)throw new Error('Autoriza el acceso a la cámara para adjuntar evidencia.');const shot=await ImagePicker.launchCameraAsync({quality:0.75,allowsEditing:false});if(shot.canceled||!shot.assets?.[0]?.uri)return;const folder=(FileSystem.documentDirectory||'')+'evidencias/';await FileSystem.makeDirectoryAsync(folder,{intermediates:true});const target=folder+Crypto.randomUUID()+'.jpg';await FileSystem.copyAsync({from:shot.assets[0].uri,to:target});setPhotos(prev=>[...prev,target]);}catch(e){Alert.alert('Fotografía',errorMessage(e));}}}/><Text style={styles.notice}>{photos.length+storedPhotoPaths.length} fotografía(s) adjunta(s). Se guardan localmente y se suben al recuperar conexión.</Text>{photos.map((uri,index)=><View key={uri} style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:8}}><Image source={{uri}} style={{width:64,height:64,borderRadius:8}}/><Text style={{flex:1}}>Evidencia {index+1}</Text><Button title="Quitar" onPress={()=>setPhotos(prev=>prev.filter(x=>x!==uri))}/></View>)}</>}
+      {kind==='anden'&&<Input label="Observaciones" value={nota} onChange={setNota}/>}
        <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}if(kind==='proceso'&&(!empacable.trim()||!Number.isFinite(n(empacable))||n(empacable)<0||n(empacable)>100)){Alert.alert('Dato obligatorio','Captura el porcentaje empacable entre 0 y 100 antes de continuar.');return;}setStep(3);}}/></>}
        {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.capturePreviewSheet}>
          <Text style={styles.capturePreviewTitle}>{kind==='anden'?'MUESTREO DE ANDÉN':'MUESTREO DE PROCESO'}</Text>
