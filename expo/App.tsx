@@ -428,7 +428,8 @@ function ReportsView(){
   const reempaques=anden.filter(r=>r.disposicion==='REEMPAQUE'||r.disposicion==='PRE-RECHAZO').length;
   const rejectionRate=anden.length?rejected/anden.length*100:0;
   const rejectionColor=rejectionRate>15?C.danger:rejectionRate>5?'#BD8A30':'#16803C';
-  const andenDaily=Object.entries(anden.reduce((acc,r)=>{const day=String(r.fecha||'').slice(0,10);if(!acc[day])acc[day]={paso:0,reempaque:0,rechazo:0};if(r.disposicion==='RECHAZO')acc[day].rechazo++;else if(r.disposicion==='REEMPAQUE'||r.disposicion==='PRE-RECHAZO')acc[day].reempaque++;else acc[day].paso++;return acc;},{} as Record<string,{paso:number;reempaque:number;rechazo:number}>)).sort((a,b)=>a[0].localeCompare(b[0]));
+  const andenDailyMap=anden.reduce<Record<string,{paso:number;reempaque:number;rechazo:number}>>((acc,r)=>{const day=String(r.fecha||'').slice(0,10);if(!acc[day])acc[day]={paso:0,reempaque:0,rechazo:0};if(r.disposicion==='RECHAZO')acc[day].rechazo++;else if(r.disposicion==='REEMPAQUE'||r.disposicion==='PRE-RECHAZO')acc[day].reempaque++;else acc[day].paso++;return acc;},{});
+  const andenDaily=Object.entries(andenDailyMap).sort((a,b)=>a[0].localeCompare(b[0]));
   const maxAndenDaily=Math.max(1,...andenDaily.map(([,v])=>v.paso+v.reempaque+v.rechazo));
   const avg=proceso.length?proceso.reduce((s,r)=>s+Number(r.potencial_empacable||0),0)/proceso.length:0;
   const defectTotals:Record<string,number>={};
