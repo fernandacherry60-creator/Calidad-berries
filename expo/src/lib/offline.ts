@@ -6,6 +6,7 @@ import { supabase, type Profile } from './cloud';
 export type TableName = 'muestreos_anden' | 'muestreos_proceso' | 'semaforo';
 export type LocalSample = { uuid: string; owner_id: string; table_name: TableName; payload: string; fecha: string; synced: number; operation?: 'insert'|'update' };
 export type PendingInvite = { email: string; code: string; name: string; puesto: string };
+export type Catalogs = { ranchos: string[]; variedades: string[] };
 let dbPromise: ReturnType<typeof initializeDatabase> | null = null;
 async function initializeDatabase() {
     const connection = await SQLite.openDatabaseAsync('calidad_berries_pro_expo.db');
@@ -50,6 +51,8 @@ export async function getAnyCachedProfile(): Promise<Profile | null> {
     return null;
   }
 }
+export async function cacheCatalogs(catalogs:Catalogs){await SecureStore.setItemAsync('quality_catalogs',JSON.stringify(catalogs));}
+export async function getCachedCatalogs():Promise<Catalogs|null>{try{const raw=await SecureStore.getItemAsync('quality_catalogs');if(!raw)return null;const value=JSON.parse(raw) as Catalogs;return Array.isArray(value.ranchos)&&Array.isArray(value.variedades)?value:null;}catch{return null;}}
 export async function clearCachedProfile() {
   await SecureStore.deleteItemAsync('verified_profile');
 }
@@ -124,8 +127,22 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
       for (const row of rows) {
         // owner_id, nombre y correo nunca proceden de entradas editables.
         const payload = JSON.parse(row.payload) as Record<string, unknown>;
+        const localPhotos=Array.isArray(payload.fotos_locales)?payload.fotos_locales.filter((v):v is string=>typeof v==='string'):[];
+        const storedPhotos=Array.isArray(payload.fotos_json)?payload.fotos_json.filter((v):v is string=>typeof v==='string'):[];
+        const uploadedPhotos:string[]=[];
+        for(let i=0;i<localPhotos.length;i++){
+          const uri=localPhotos[i];
+          const response=await fetch(uri);
+          if(!response.ok)throw new Error('No se pudo leer una fotografía guardada en el teléfono.');
+          const blob=await response.blob();
+          const path=user.id+'/'+row.uuid+'/'+i+'.jpg';
+          const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,blob,{contentType:blob.type||'image/jpeg',upsert:true});
+          if(photoError)throw photoError;
+          uploadedPhotos.push(path);
+        }
+        const {fotos_locales:_localPhotos,...basePayload}=payload;
         const sanitized = {
-          ...payload, owner_id: user.id, usuario_email: profile.email,
+          ...basePayload, fotos_json:[...storedPhotos,...uploadedPhotos], owner_id: user.id, usuario_email: profile.email,
           usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
         };
         if(row.operation==='update'){
