@@ -73,6 +73,26 @@ export async function saveSample(table: TableName, payload: Record<string, unkno
     [String(payload.uuid),ownerId,table,JSON.stringify(payload),String(payload.fecha)],
   );
 }
+export async function cacheRemoteSample(table:TableName,payload:Record<string,unknown>){
+  const connection=await db();
+  const uuid=String(payload.uuid||'');
+  const ownerId=String(payload.owner_id||'');
+  if(!uuid||!ownerId)throw new Error('No se puede guardar en caché un muestreo sin identificador o propietario.');
+  await connection.runAsync(
+    "INSERT INTO samples(uuid,owner_id,table_name,payload,fecha,synced,operation) VALUES (?,?,?,?,?,1,'insert') ON CONFLICT(uuid) DO UPDATE SET table_name=excluded.table_name,payload=excluded.payload,fecha=excluded.fecha,synced=1,operation='insert' WHERE samples.synced=1",
+    [uuid,ownerId,table,JSON.stringify(payload),String(payload.fecha||'')],
+  );
+}
+export async function localTeamSamples():Promise<LocalSample[]>{
+  const connection=await db();
+  return connection.getAllAsync<LocalSample>("SELECT * FROM samples ORDER BY fecha DESC LIMIT 500");
+}
+export async function cacheTeamProfiles(profiles:Profile[]){
+  await SecureStore.setItemAsync('quality_team_profiles',JSON.stringify(profiles));
+}
+export async function getCachedTeamProfiles():Promise<Profile[]>{
+  try{const raw=await SecureStore.getItemAsync('quality_team_profiles');if(!raw)return [];const value=JSON.parse(raw);return Array.isArray(value)?value as Profile[]:[];}catch{return [];}
+}
 export async function updatePendingSample(uuid:string,ownerId:string,payload:Record<string,unknown>){
   const connection=await db();
   const result=await connection.runAsync('UPDATE samples SET payload=? WHERE uuid=? AND owner_id=? AND synced=0',[JSON.stringify(payload),uuid,ownerId]);
@@ -80,25 +100,25 @@ export async function updatePendingSample(uuid:string,ownerId:string,payload:Rec
 }
 export async function updateSyncedSample(table:TableName,uuid:string,ownerId:string,changes:Record<string,unknown>,profile:Profile){
   if(table==='semaforo')throw new Error('Esta edición solo admite andén y proceso.');
-  if(!profile.active||profile.user_id!==ownerId&&profile.role!=='admin')throw new Error('No tienes permiso para editar este registro.');
+  if(!profile.active||ownerId!==profile.user_id&&profile.role!=='admin')throw new Error('No tienes permiso para editar este registro.');
   const connection=await db();
   const row=await connection.getFirstAsync<LocalSample>('SELECT * FROM samples WHERE uuid=? AND owner_id=?',[uuid,ownerId]);
   const updated={...(row?JSON.parse(row.payload):{}),...changes,uuid,owner_id:ownerId};
   const network=await NetInfo.fetch();
-  if(row&&ownerId===profile.user_id){
+  if(row){
     await connection.runAsync("UPDATE samples SET payload=?,synced=0,operation='update' WHERE uuid=? AND owner_id=?",[JSON.stringify(updated),uuid,ownerId]);
     if(network.isConnected&&network.isInternetReachable!==false)await syncSamples(profile);
     return;
   }
-  if(!network.isConnected||network.isInternetReachable===false)throw new Error('Para editar un registro que no está guardado en este teléfono se requiere conexión.');
+  if(!network.isConnected||network.isInternetReachable===false)throw new Error('Este muestreo todavía no está guardado en el teléfono. Conéctate una vez para descargarlo y después podrás editarlo sin conexión.');
   const {data:{user},error:authError}=await supabase.auth.getUser();
   if(authError||!user||user.id!==profile.user_id)throw new Error('Sesión no válida para editar el registro.');
   const {uuid:_uuid,owner_id:_owner,fotos_locales:_localPhotos,...fields}=changes;
   const {data,error}=await supabase.from(table).update(fields).eq('uuid',uuid).eq('owner_id',ownerId).select('uuid').maybeSingle();
   if(error)throw error;
   if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
-  if(row)await connection.runAsync("UPDATE samples SET payload=?,synced=1,operation='insert' WHERE uuid=? AND owner_id=?",[JSON.stringify(updated),uuid,ownerId]);
 }
+
 export async function pendingCount(ownerId: string) {
   const connection = await db();
   const result = await connection.getFirstAsync<{ total: number }>(
@@ -123,8 +143,9 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
   try {
     const connection = await db();
     while (true) {
-      const rows = await connection.getAllAsync<LocalSample>(
-        'SELECT * FROM samples WHERE owner_id=? AND synced=0 ORDER BY fecha ASC LIMIT 100',[user.id]);
+      const rows = profile.role==='admin'
+        ? await connection.getAllAsync<LocalSample>("SELECT * FROM samples WHERE synced=0 ORDER BY fecha ASC LIMIT 100")
+        : await connection.getAllAsync<LocalSample>("SELECT * FROM samples WHERE owner_id=? AND synced=0 ORDER BY fecha ASC LIMIT 100",[user.id]);
       if (rows.length === 0) break;
       for (const row of rows) {
         // owner_id, nombre y correo nunca proceden de entradas editables.
@@ -136,23 +157,27 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
           const uri=localPhotos[i];
           const base64=await FileSystem.readAsStringAsync(uri,{encoding:FileSystem.EncodingType.Base64});
           if(!base64)throw new Error('No se pudo leer una fotografía guardada en el teléfono.');
-          const path=user.id+'/'+row.uuid+'/'+i+'.jpg';
-          const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,decode(base64),{contentType:'image/jpeg',upsert:true});
+          const extension=uri.split('?')[0].split('.').pop()?.toLowerCase()||'jpg';
+          const mime=extension==='png'?'image/png':extension==='webp'?'image/webp':extension==='heic'?'image/heic':'image/jpeg';
+          const normalizedExtension=extension==='jpeg'?'jpg':extension;
+          const path=user.id+'/'+row.uuid+'/'+i+'.'+normalizedExtension;
+          const {error:photoError}=await supabase.storage.from('evidencias-muestreos').upload(path,decode(base64),{contentType:mime,upsert:true});
           if(photoError)throw photoError;
           uploadedPhotos.push(path);
         }
         const {fotos_locales:_localPhotos,...basePayload}=payload;
         const sanitized = {
-          ...basePayload, uuid:row.uuid, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: user.id, usuario_email: profile.email,
+          ...basePayload, uuid:row.uuid, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: row.owner_id, usuario_email: profile.email,
           usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
         };
         if(row.operation==='update'){
           const {uuid:_uuid,owner_id:_owner,...fields}=sanitized;
-          const {data,error}=await supabase.from(row.table_name).update(fields).eq('uuid',row.uuid).eq('owner_id',user.id).select('uuid').maybeSingle();
+          const {data,error}=await supabase.from(row.table_name).update(fields).eq('uuid',row.uuid).eq('owner_id',row.owner_id).select('uuid').maybeSingle();
           if(error)throw error;
           if(!data)throw new Error('No se pudo sincronizar la edición del registro '+row.uuid);
         }else{
-          const { error } = await supabase.from(row.table_name).insert(sanitized);
+          if(row.owner_id!==user.id)throw new Error('No se permite crear un registro a nombre de otro trabajador.');
+          const { error } = await supabase.from(row.table_name).insert({...sanitized,owner_id:user.id});
           if (error) {
             if (error.code !== '23505') throw error;
             const check = await supabase.from(row.table_name).select('uuid').eq('uuid',row.uuid).eq('owner_id',user.id).maybeSingle();
