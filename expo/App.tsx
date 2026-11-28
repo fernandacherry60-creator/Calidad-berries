@@ -487,6 +487,7 @@ function HistoryView({profile,onEdit}:{profile:Profile;onEdit:(row:LocalSample)=
 function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';profile:Profile;onSaved:()=>Promise<void>;editing:LocalSample|null}){
   const [rancho,setRancho]=useState(ranchos[0]),[sector,setSector]=useState(''),[variedad,setVariedad]=useState(variedades[0]);
   const [licencia,setLicencia]=useState(''),[brix,setBrix]=useState('');
+  const [evaluador,setEvaluador]=useState(profile.display_name);
   const [photos,setPhotos]=useState<string[]>([]),[storedPhotoPaths,setStoredPhotoPaths]=useState<string[]>([]);
   const [catalogOptions,setCatalogOptions]=useState({ranchos,variedades});
   const [presentacion,setPresentacion]=useState('6 oz'),[cuadrilla,setCuadrilla]=useState('');
@@ -509,13 +510,16 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
   const activeDefects=defects.filter(d=>n(counts[d.key]||'0')>0);
   const countedPreview=Object.values(previewCounts).reduce((sum,value)=>sum+value,0);
   const validPreview=totalPreview>0&&Object.values(previewCounts).reduce((s,v)=>s+v,0)<=totalPreview;
-  const andenPreview=kind==='anden'&&validPreview?scoreAnden(previewCounts,totalPreview,n(larvas)):null;
+  const baseAndenPreview=kind==='anden'&&validPreview?scoreAnden(previewCounts,totalPreview,n(larvas)):null;
+  const selectedPresentation=presentaciones.find(p=>p.name===presentacion);
+  const lowWeight=kind==='anden'&&peso.trim()!==''&&n(peso)>0&&!!selectedPresentation&&n(peso)<selectedPresentation.min;
+  const andenPreview=baseAndenPreview?{...baseAndenPreview,disposicion:lowWeight?'RECHAZO':baseAndenPreview.disposicion}:null;
   const procesoPreview=kind==='proceso'&&validPreview?scoreProceso(previewCounts,totalPreview,n(cajas),n(taras),empacable.trim()?n(empacable):undefined):null;
   useEffect(()=>{
     if(!editing)return;
     const p=JSON.parse(editing.payload) as Record<string,unknown>;
     setRancho(String(p.rancho||ranchos[0]));setSector(String(p.sector||''));setVariedad(String(p.variedad||variedades[0]));
-    setLicencia(String(p.licencia||''));setBrix(p.grados_brix==null?'':String(p.grados_brix));
+    setLicencia(String(p.licencia||''));setBrix(p.grados_brix==null?'':String(p.grados_brix));setEvaluador(String(p.evaluador||profile.display_name));
     setPhotos(Array.isArray(p.fotos_locales)?p.fotos_locales.filter((v):v is string=>typeof v==='string'):[]);setStoredPhotoPaths(Array.isArray(p.fotos_json)?p.fotos_json.filter((v):v is string=>typeof v==='string'):[]);
     setPresentacion(String(p.presentacion||'6 oz'));setCuadrilla(String(p.cuadrilla||''));
     setCajas(String(p.cajas_recibidas??p.cajas??0));setTaras(String(p.taras??0));
@@ -540,13 +544,19 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
       let payload:Record<string,unknown>|null=null;
       let table:TableName|null=null;
       if(kind==='anden'){
+        if(!rancho.trim()||!sector.trim()||!variedad.trim()||!presentacion.trim()||!cuadrilla.trim())throw new Error('Completa rancho, sector, variedad, presentación y cuadrilla');
+        if(!licencia.trim())throw new Error('Captura la licencia del transportista');
+        if(!evaluador.trim())throw new Error('Captura el nombre del evaluador');
         if(Object.values(defectCounts).reduce((a,b)=>a+b,0)>total)throw new Error('Los defectos superan el total de frutos');
         const score=scoreAnden(defectCounts,total,larva);
+        const presentation=presentaciones.find(p=>p.name===presentacion);
+        const isUnderweight=!!presentation&&n(peso)>0&&n(peso)<presentation.min;
+        const underweightReason=isUnderweight?'Bajo peso ('+n(peso).toFixed(1)+' g, mínimo '+presentation!.min+' g)':'';
         payload={uuid,fecha,cultivo:'Frambuesa',rancho,sector,variedad,presentacion,cuadrilla,licencia,grados_brix:brix?n(brix):null,
           cajas_recibidas:box,canastos:canastosPorCajas(box),fruta_muestra:total,
           peso:peso?n(peso):null,frutos_larva:larva,fotos_locales:photos,fotos_json:storedPhotoPaths,
-          evaluador:profile.display_name,muestreados:embaladora,defectos_json:defectCounts,
-          ...score,motivo:nota,...identity(profile)};
+          evaluador:evaluador.trim(),muestreados:embaladora,defectos_json:defectCounts,
+          ...score,disposicion:isUnderweight?'RECHAZO':score.disposicion,motivo:isUnderweight?underweightReason:nota,...identity(profile)};
         table='muestreos_anden';
       }else if(kind==='proceso'){
         if(Object.values(defectCounts).reduce((a,b)=>a+b,0)>total)throw new Error('Los defectos superan el total de frutos');
@@ -581,7 +591,7 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
     <Text style={styles.subtitle}>Frambuesa · captura segura sin conexión</Text>
       <Text style={styles.section}>Paso {step} de 3 · {step===1?'Datos generales':step===2?'Formato de muestreo':'Resultado final'}</Text>
       {step===1&&<><Choice label="Rancho" options={catalogOptions.ranchos} value={rancho} onChange={setRancho}/>
-      {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Input label="Licencia" value={licencia} onChange={setLicencia}/><Input label="Grados Brix" value={brix} onChange={setBrix} keyboard="numeric"/><Choice label="Variedad" options={catalogOptions.variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
+      {kind==='anden'&&<><Input label="Sector" value={sector} onChange={setSector}/><Input label="Licencia" value={licencia} onChange={setLicencia}/><Input label="Evaluador" value={evaluador} onChange={setEvaluador}/><Input label="Grados Brix" value={brix} onChange={setBrix} keyboard="numeric"/><Choice label="Variedad" options={catalogOptions.variedades} value={variedad} onChange={setVariedad}/><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion}/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla}/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora}/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric"/><Input label="Frutos con larva" value={larvas} onChange={setLarvas} keyboard="numeric"/></>}
       {kind==='proceso'?<><View style={{padding:12,backgroundColor:'#FFF4DD',borderRadius:10,marginBottom:12}}><Text style={{fontWeight:'800',color:C.ink,marginBottom:8}}>Indicador de porcentaje de proceso</Text><View style={{gap:7}}><Text style={{fontSize:12,color:'#16803C',fontWeight:'800'}}>● VERDE · ÓPTIMO · hasta 5%</Text><Text style={{fontSize:12,color:'#BD8A30',fontWeight:'800'}}>● AMARILLO · PRECAUCIÓN · más de 5% y menos de 10%</Text><Text style={{fontSize:12,color:C.danger,fontWeight:'800'}}>● ROJO · ALTO · 10% o más</Text></View></View><Button title="Siguiente · Formato de muestreo" onPress={()=>setStep(2)}/></>:<><Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric"/><Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric"/>{kind==='anden'&&<Text style={styles.notice}>Canastos sugeridos: {canastosPorCajas(n(cajas))} (1 por cada 24 cajas o fracción)</Text>}<Button title="Siguiente · Formato de muestreo" onPress={()=>{if(!Number.isInteger(n(frutos))||n(frutos)<=0||n(cajas)<0||n(taras)<0){Alert.alert('Revisar datos','Comprueba las cantidades');return;}setStep(2);}}/></>}</>}
       {step===2&&<>{kind==='proceso'&&<><Choice label="Presentación" options={presentaciones.map(p=>p.name)} value={presentacion} onChange={setPresentacion} compact/><Input label="Cuadrilla" value={cuadrilla} onChange={setCuadrilla} compact/><Input label="Embaladora" value={embaladora} onChange={setEmbaladora} compact/><Input label="Peso en gramos" value={peso} onChange={setPeso} keyboard="numeric" compact/><Input label="Frutos con larvas" value={larvas} onChange={setLarvas} keyboard="numeric" compact/><Input label="Cajas" value={cajas} onChange={setCajas} keyboard="numeric" compact/><Input label="Taras" value={taras} onChange={setTaras} keyboard="numeric" compact/><Input label="Frutos inspeccionados" value={frutos} onChange={setFrutos} keyboard="numeric" compact/><View style={{padding:10,backgroundColor:'#FFF4DD',borderRadius:10,marginBottom:10}}><Text style={{fontWeight:'700',color:processColor(liveProcess)}}>Porcentaje de proceso: {liveProcess===null?'—':liveProcess.toFixed(1)+'%'} · {processLabel(liveProcess)}</Text></View><Input label="Porcentaje empacable (%) · captura obligatoria" value={empacable} onChange={setEmpacable} keyboard="numeric" compact/></>}<Text style={styles.label}>Frutos: {frutos} · Embaladora: {embaladora||'—'}</Text><Text style={styles.section}>Defectos encontrados</Text>
       {defects.map(d=><View key={d.key} style={styles.defectRow}>
@@ -594,8 +604,9 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
        <Button title="Volver a datos" onPress={()=>setStep(1)}/><Button title="Siguiente · Resultado" onPress={()=>{if(!validPreview){Alert.alert('Revisar captura','Los defectos no pueden superar los frutos');return;}if(kind==='proceso'&&(!empacable.trim()||!Number.isFinite(n(empacable))||n(empacable)<0||n(empacable)>100)){Alert.alert('Dato obligatorio','Captura el porcentaje empacable entre 0 y 100 antes de continuar.');return;}setStep(3);}}/></>}
        {step===3&&<><Button title="Revisar defectos" onPress={()=>setStep(2)}/><View style={styles.capturePreviewSheet}>
          <Text style={styles.capturePreviewTitle}>{kind==='anden'?'MUESTREO DE ANDÉN':'MUESTREO DE PROCESO'}</Text>
-         <Text style={styles.label}>Rancho: {rancho} · Frutos: {frutos} {kind==='anden'?'· Embaladora: '+(embaladora||'—')+' · Licencia: '+(licencia||'—')+' · Brix: '+(brix||'—'):''}</Text>
+         <Text style={styles.label}>Rancho: {rancho} · Frutos: {frutos} {kind==='anden'?'· Embaladora: '+(embaladora||'—')+' · Licencia: '+(licencia||'—')+' · Brix: '+(brix||'—')+' · Evaluador: '+evaluador:''}</Text>
          {!validPreview&&<Text style={{color:C.danger}}>Revisa el total de frutos y defectos antes de guardar.</Text>}
+         {kind==='anden'&&lowWeight&&<Text style={{color:C.danger,fontWeight:'800'}}>RECHAZO POR BAJO PESO: {n(peso).toFixed(1)} g; mínimo {selectedPresentation?.min} g.</Text>}
          {andenPreview&&<><View style={{padding:12,borderRadius:10,backgroundColor:andenPreview.disposicion==='RECHAZO'?'#FCE4E4':andenPreview.disposicion==='REEMPAQUE'?'#FFF3D6':'#E5F3E8',marginVertical:6}}><Text style={{fontSize:17,fontWeight:'900',color:andenPreview.disposicion==='RECHAZO'?C.danger:andenPreview.disposicion==='REEMPAQUE'?'#A66B00':'#16803C'}}>RESULTADO: {andenPreview.disposicion}</Text><Text style={{fontWeight:'700',color:andenPreview.disposicion==='RECHAZO'?C.danger:C.ink}}>{andenPreview.puntos_total} puntos</Text></View><Text style={styles.label}>Condición: {(andenPreview.pct_condicion*100).toFixed(1)}% · Apariencia: {(andenPreview.pct_apariencia*100).toFixed(1)}%</Text></>}
          {procesoPreview&&<><Text style={styles.label}>Presentación: {presentacion} · Cuadrilla: {cuadrilla||'—'} · Embaladora: {embaladora||'—'}</Text><Text style={styles.label}>Peso: {peso||'—'} g · Larvas: {larvas} · Cajas: {cajas} · Taras: {taras} · Frutos: {frutos}</Text><Text style={[styles.label,{color:processColor(procesoPreview.pct_proceso)}]}>Porcentaje de proceso: {procesoPreview.pct_proceso?.toFixed(1)??'—'}% · {processLabel(procesoPreview.pct_proceso)}</Text><Text style={styles.label}>Empacable (manual): {empacable||'Pendiente'}%</Text><Text style={styles.section}>Áreas de enfoque</Text>
            <Text>Agronomía: {procesoPreview.area_agronomia.toFixed(1)}% · Cosecha: {procesoPreview.area_cosecha.toFixed(1)}%</Text>
