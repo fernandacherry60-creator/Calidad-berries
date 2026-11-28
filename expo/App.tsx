@@ -333,9 +333,16 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
       setMembers(team);await cacheTeamProfiles(team);
       const all:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso'] as TableName[]){
-        const result=await supabase.from(table).select('*').order('fecha',{ascending:false}).limit(50);
-        if(result.error)throw result.error;
-        const records=(result.data||[]) as Record<string,unknown>[];
+        let offset=0;
+        const records:Record<string,unknown>[]=[];
+        while(true){
+          const result=await supabase.from(table).select('*').order('fecha',{ascending:false}).range(offset,offset+999);
+          if(result.error)throw result.error;
+          const page=(result.data||[]) as Record<string,unknown>[];
+          records.push(...page);
+          if(page.length<1000)break;
+          offset+=1000;
+        }
         for(const record of records)await cacheRemoteSample(table,record);
         all.push(...records.map(item=>({...item,tipo:table})));
       }
@@ -352,11 +359,11 @@ function TeamView({onEdit}:{onEdit:(row:LocalSample)=>void}){
         if(!visible.has(local.uuid))visible.set(local.uuid,{...JSON.parse(local.payload) as Record<string,unknown>,tipo:local.table_name,_localRow:local});
       }
       const combined=[...visible.values()].sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha)));
-      setSamples(combined);setOfflineMode(false);
+      setSamples(combined.slice(0,100));setOfflineMode(false);
     }catch(e){
       const [cachedMembers,cachedRows]=await Promise.all([getCachedTeamProfiles(),localTeamSamples()]);
       if(cachedMembers.length)setMembers(cachedMembers);
-      setSamples(cachedRows.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tipo:row.table_name,_localRow:row})).filter(row=>row.tipo==='muestreos_anden'||row.tipo==='muestreos_proceso'));
+      setSamples(cachedRows.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tipo:row.table_name,_localRow:row})).filter(row=>row.tipo==='muestreos_anden'||row.tipo==='muestreos_proceso').slice(0,100));
       setOfflineMode(true);
     }
   },[]);
@@ -429,18 +436,19 @@ function ReportsView(){
   useEffect(()=>{let active=true;(async()=>{const cached=await getCachedCatalogs();if(active&&cached)setRanchOptions(cached.ranchos);try{const {data,error}=await supabase.from('cb_catalogs').select('ranchos').eq('id',1).maybeSingle();if(!error&&data&&active){const list=Array.isArray(data.ranchos)?data.ranchos:ranchos;setRanchOptions(list);await cacheCatalogs({ranchos:list,variedades:variedades});}}catch{/* se usa el catálogo local */}})();return()=>{active=false;};},[]);
   const [rows,setRows]=useState<Record<string,unknown>[]>([]);
   const [loading,setLoading]=useState(false),[exporting,setExporting]=useState(false);
+  const [offlineMode,setOfflineMode]=useState(false);
   const load=async()=>{
     setLoading(true);
+    const now=new Date();
+    const from=new Date(now);from.setHours(0,0,0,0);
+    let until:Date|null=null;
+    if(period==='7 días')from.setDate(from.getDate()-6);
+    else if(period==='Mes actual')from.setDate(1);
+    else if(period==='Mes anterior'){
+      from.setDate(1);from.setMonth(from.getMonth()-1);
+      until=new Date(from);until.setMonth(until.getMonth()+1);
+    }else if(period==='30 días')from.setDate(from.getDate()-29);
     try{
-      const now=new Date();
-      const from=new Date(now);from.setHours(0,0,0,0);
-      let until:Date|null=null;
-      if(period==='7 días')from.setDate(from.getDate()-6);
-      else if(period==='Mes actual')from.setDate(1);
-      else if(period==='Mes anterior'){
-        from.setDate(1);from.setMonth(from.getMonth()-1);
-        until=new Date(from);until.setMonth(until.getMonth()+1);
-      }else if(period==='30 días')from.setDate(from.getDate()-29);
       const results:Record<string,unknown>[]=[];
       for(const table of ['muestreos_anden','muestreos_proceso'] as const){
         let offset=0;
@@ -456,8 +464,19 @@ function ReportsView(){
           offset+=1000;
         }
       }
-      setRows(results);
-    }catch(e){Alert.alert('Informes',errorMessage(e));}finally{setLoading(false);}
+      setRows(results);setOfflineMode(false);
+    }catch(e){
+      try{
+        const cached=await localTeamSamples();
+        const localRows=cached.map(row=>({...JSON.parse(row.payload) as Record<string,unknown>,tabla:row.table_name}));
+        const filtered=localRows.filter(row=>{
+          const date=String(row.fecha||'');
+          return (date>=from.toISOString())&&(!until||date<until.toISOString())&&(rancho==='Todos'||row.rancho===rancho);
+        });
+        if(cached.length){setRows(filtered);setOfflineMode(true);}
+        else Alert.alert('Informes',errorMessage(e));
+      }catch{Alert.alert('Informes',errorMessage(e));}
+    }finally{setLoading(false);}
   };
   const anden=rows.filter(r=>r.tabla==='muestreos_anden'),proceso=rows.filter(r=>r.tabla==='muestreos_proceso');
   const rejected=anden.filter(r=>r.disposicion==='RECHAZO').length;
@@ -487,7 +506,7 @@ function ReportsView(){
   return <><Text style={styles.heading}>Informes de calidad</Text>
     <Choice label="Periodo" options={['Hoy','7 días','Mes actual','Mes anterior','30 días']} value={period} onChange={setPeriod}/>
     <Choice label="Rancho" options={['Todos',...ranchOptions]} value={rancho} onChange={setRancho}/>
-    <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/><Button title={exporting?'Preparando Excel…':'Exportar Excel · 3 hojas'} disabled={exporting||rows.length===0} onPress={()=>void exportExcel()}/>
+    <Button title={loading?'Consultando…':'Generar informe'} disabled={loading} onPress={()=>void load()}/>{offlineMode&&<Text style={styles.notice}>Sin conexión: este informe usa los registros que se descargaron previamente en este teléfono.</Text>}<Button title={exporting?'Preparando Excel…':'Exportar Excel · 3 hojas'} disabled={exporting||rows.length===0} onPress={()=>void exportExcel()}/>
     <Text style={styles.section}>Andenes</Text>
     <View style={{flexDirection:'row',gap:7,marginBottom:12}}>
       <View style={[styles.card,{flex:1,marginBottom:0,padding:10,borderLeftColor:C.green}]}><Text style={{fontSize:11,color:C.muted,fontWeight:'700'}}>TARIMAS</Text><Text style={{fontSize:23,fontWeight:'900',color:C.ink}}>{anden.length}</Text></View>
