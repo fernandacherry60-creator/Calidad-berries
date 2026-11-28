@@ -119,10 +119,11 @@ export async function updateSyncedSample(table:TableName,uuid:string,ownerId:str
   if(!data)throw new Error('No se actualizó el registro; comprueba los permisos.');
 }
 
-export async function pendingCount(ownerId: string) {
+export async function pendingCount(ownerId: string, includeAll=false) {
   const connection = await db();
-  const result = await connection.getFirstAsync<{ total: number }>(
-    'SELECT COUNT(*) AS total FROM samples WHERE owner_id=? AND synced=0',[ownerId]);
+  const result = includeAll
+    ? await connection.getFirstAsync<{ total: number }>('SELECT COUNT(*) AS total FROM samples WHERE synced=0')
+    : await connection.getFirstAsync<{ total: number }>('SELECT COUNT(*) AS total FROM samples WHERE owner_id=? AND synced=0',[ownerId]);
   return result?.total ?? 0;
 }
 export async function localSamples(ownerId: string): Promise<LocalSample[]> {
@@ -133,7 +134,7 @@ export async function localSamples(ownerId: string): Promise<LocalSample[]> {
 let syncing = false;
 export async function syncSamples(profile: Profile): Promise<{ uploaded: number; pending: number }> {
   const network = await NetInfo.fetch();
-  if (!network.isConnected || network.isInternetReachable === false) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
+  if (!network.isConnected || network.isInternetReachable === false) return { uploaded: 0, pending: await pendingCount(profile.user_id,profile.role==='admin') };
   if (syncing) return { uploaded: 0, pending: await pendingCount(profile.user_id) };
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError) throw userError;
@@ -167,8 +168,9 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
         }
         const {fotos_locales:_localPhotos,...basePayload}=payload;
         const sanitized = {
-          ...basePayload, uuid:row.uuid, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: row.owner_id, usuario_email: profile.email,
-          usuario_nombre: profile.display_name, usuario_puesto: profile.puesto,
+          ...basePayload, uuid:row.uuid, fotos_json:[...new Set([...storedPhotos,...uploadedPhotos])], owner_id: row.owner_id, usuario_email: row.operation==='update'?String(basePayload.usuario_email||profile.email):profile.email,
+          usuario_nombre: row.operation==='update'?String(basePayload.usuario_nombre||profile.display_name):profile.display_name,
+          usuario_puesto: row.operation==='update'?String(basePayload.usuario_puesto||profile.puesto):profile.puesto,
         };
         if(row.operation==='update'){
           const {uuid:_uuid,owner_id:_owner,...fields}=sanitized;
@@ -185,10 +187,10 @@ export async function syncSamples(profile: Profile): Promise<{ uploaded: number;
             if (!check.data) throw new Error('No se pudo confirmar un registro duplicado: '+row.uuid);
           }
         }
-        await connection.runAsync("UPDATE samples SET synced=1,operation='insert' WHERE uuid=? AND owner_id=?",[row.uuid,user.id]);
+        await connection.runAsync("UPDATE samples SET synced=1,operation='insert' WHERE uuid=? AND owner_id=?",[row.uuid,row.owner_id]);
         uploaded++;
       }
     }
   } finally { syncing = false; }
-  return { uploaded, pending: await pendingCount(profile.user_id) };
+  return { uploaded, pending: await pendingCount(profile.user_id,profile.role==='admin') };
 }
