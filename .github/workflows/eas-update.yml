@@ -40,7 +40,7 @@ jobs:
             exit 1
           fi
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       - name: Validate TypeScript
         run: npx tsc --noEmit
       - name: Install EAS CLI
