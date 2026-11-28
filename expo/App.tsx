@@ -612,8 +612,14 @@ function CaptureView({kind,profile,onSaved,editing}:{kind:'anden'|'proceso';prof
         if(editing.synced){
           const {uuid:_uuid,fecha:_fecha,owner_id:_owner,usuario_email:_email,usuario_nombre:_nombre,usuario_puesto:_puesto,evaluador:_evaluador,...fields}=changes;
           await updateSyncedSample(table,editing.uuid,editing.owner_id,fields,profile);
-        }else await updatePendingSample(editing.uuid,profile.user_id,updated);
-        Alert.alert('Actualizado','El muestreo se modificó correctamente.');
+          const network=await NetInfo.fetch();
+          Alert.alert('Actualizado',network.isConnected&&network.isInternetReachable!==false
+            ?'El muestreo se modificó y sincronizó correctamente.'
+            :'Los cambios quedaron guardados en este teléfono y se sincronizarán al recuperar internet.');
+        }else{
+          await updatePendingSample(editing.uuid,profile.user_id,updated);
+          Alert.alert('Actualizado','Los cambios quedaron guardados en este teléfono y se sincronizarán al recuperar internet.');
+        }
       }else{
         await saveSample(table,payload,profile.user_id);
         Alert.alert('Guardado','Registro almacenado en el teléfono. Se sincronizará al tener conexión.');
